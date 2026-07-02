@@ -1,7 +1,4 @@
-import {
-  analysisResponseSchema,
-  type AnalysisResponse,
-} from "./analysis-schema";
+import type { z } from "zod";
 
 export class OpenAIError extends Error {
   constructor(
@@ -24,12 +21,13 @@ interface ChatCompletionResponse {
   };
 }
 
-export async function callOpenAI(
+export async function callOpenAIJson<T>(
   apiKey: string,
   model: string,
   system: string,
   user: string,
-): Promise<AnalysisResponse> {
+  schema: z.ZodType<T>,
+): Promise<T> {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -67,7 +65,7 @@ export async function callOpenAI(
     throw new OpenAIError("Malformed JSON in OpenAI response");
   }
 
-  const result = analysisResponseSchema.safeParse(parsed);
+  const result = schema.safeParse(parsed);
   if (!result.success) {
     throw new OpenAIError("OpenAI response did not match expected schema");
   }

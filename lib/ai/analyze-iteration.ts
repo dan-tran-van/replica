@@ -5,7 +5,8 @@ import type {
   Workflow,
 } from "@/lib/domain/types";
 import { buildAnalysisMessages } from "./build-analysis-messages";
-import { callOpenAI, OpenAIError } from "./openai-client";
+import { callOpenAIJson, OpenAIError } from "./openai-client";
+import { analysisResponseSchema } from "./analysis-schema";
 
 export interface AnalyzeIterationResult {
   analysis: IterationAnalysis;
@@ -29,11 +30,12 @@ export async function analyzeIteration(
   });
 
   try {
-    const response = await callOpenAI(
+    const response = await callOpenAIJson(
       settings.openaiApiKey,
       settings.openaiModel,
       system,
       user,
+      analysisResponseSchema,
     );
 
     return {

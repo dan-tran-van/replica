@@ -11,7 +11,10 @@ export function AppHeader() {
         >
           Replica
         </Link>
-        <nav>
+        <nav className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/insights">Insights</Link>
+          </Button>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/settings">Settings</Link>
           </Button>

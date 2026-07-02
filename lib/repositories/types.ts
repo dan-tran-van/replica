@@ -17,6 +17,7 @@ export interface WorkflowRepository {
 
 export interface IterationRepository {
   listByWorkflow(workflowId: string): Promise<Iteration[]>;
+  listAll(): Promise<Iteration[]>;
   get(id: string): Promise<Iteration | null>;
   create(input: CreateIterationInput, sequenceNumber: number): Promise<Iteration>;
   updateAnalysis(

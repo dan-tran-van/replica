@@ -18,6 +18,11 @@ export class IndexedDBIterationRepository implements IterationRepository {
     return iterations.sort((a, b) => a.sequenceNumber - b.sequenceNumber);
   }
 
+  async listAll(): Promise<Iteration[]> {
+    const db = await getDB();
+    return db.getAll(STORES.iterations);
+  }
+
   async get(id: string): Promise<Iteration | null> {
     const db = await getDB();
     return (await db.get(STORES.iterations, id)) ?? null;
