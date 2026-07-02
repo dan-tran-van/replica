@@ -41,7 +41,7 @@ export function InsightsPage() {
         description="Create a workflow and log a few runs to start discovering patterns across your prompt improvement journey."
         action={
           <Button asChild>
-            <Link href="/">Create a workflow</Link>
+            <Link href="/workflows">Create a workflow</Link>
           </Button>
         }
       />
@@ -55,7 +55,7 @@ export function InsightsPage() {
         description="Log your first run in a workflow, then come back to see cross-workflow patterns."
         action={
           <Button asChild>
-            <Link href="/">Go to workflows</Link>
+            <Link href="/workflows">Go to workflows</Link>
           </Button>
         }
       />

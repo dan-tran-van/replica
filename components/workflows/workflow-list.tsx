@@ -26,7 +26,8 @@ export function WorkflowList() {
         <div>
           <h1 className="text-xl font-semibold">Workflows</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Improve your Manus Scheduled prompts through reflection.
+            Improve recurring AI workflows through reflection—including Manus
+            Scheduled Tasks and any external agent you run on a schedule.
           </p>
         </div>
         {data.length > 0 ? (

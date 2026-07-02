@@ -32,7 +32,7 @@ export default function WorkflowPage({
     setIsDeleting(true);
     try {
       await remove();
-      router.push("/");
+      router.push("/workflows");
     } finally {
       setIsDeleting(false);
     }
@@ -47,7 +47,7 @@ export default function WorkflowPage({
       <div className="space-y-4">
         <p className="text-sm text-destructive">{error ?? "Workflow not found"}</p>
         <Button variant="link" asChild className="h-auto p-0">
-          <Link href="/">Back to workflows</Link>
+          <Link href="/workflows">Back to workflows</Link>
         </Button>
       </div>
     );
@@ -60,7 +60,7 @@ export default function WorkflowPage({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Button variant="link" asChild className="h-auto p-0 text-muted-foreground">
-            <Link href="/">← Workflows</Link>
+            <Link href="/workflows">← Workflows</Link>
           </Button>
           <h1 className="mt-2 text-xl font-semibold">{workflow.name}</h1>
           <p className="mt-1 text-sm text-muted-foreground">

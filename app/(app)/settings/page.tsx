@@ -134,7 +134,7 @@ export default function SettingsPage() {
                   <span className="text-sm text-primary">Saved</span>
                 ) : null}
                 <Button variant="ghost" asChild>
-                  <Link href="/">Back to workflows</Link>
+                  <Link href="/workflows">Back to workflows</Link>
                 </Button>
               </div>
             </form>

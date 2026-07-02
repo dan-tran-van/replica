@@ -2,6 +2,6 @@
 
 import { WorkflowList } from "@/components/workflows/workflow-list";
 
-export default function HomePage() {
+export default function WorkflowsPage() {
   return <WorkflowList />;
 }

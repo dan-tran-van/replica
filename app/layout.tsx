@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Outfit } from "next/font/google";
 import { ThemeProvider } from "next-themes";
-import { AppHeader } from "@/components/shared/app-header";
 import { RepositoryProvider } from "@/components/providers/repository-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -20,9 +19,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Replica — Prompt reflection for Manus",
+  title: "Replica — Improve AI workflows through reflection",
   description:
-    "Improve your Manus Scheduled prompts through repeated execution, reflection, and iteration.",
+    "Record runs, capture reflections, and propose better prompts for recurring AI workflows. Local-first, browser-only.",
 };
 
 export default function RootLayout({
@@ -45,10 +44,7 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <RepositoryProvider>
-            <AppHeader />
-            <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-              {children}
-            </main>
+            {children}
             <Toaster />
           </RepositoryProvider>
         </ThemeProvider>

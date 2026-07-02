@@ -28,7 +28,7 @@ export default function LogIterationPage({
           {error ?? "Workflow not found"}
         </p>
         <Button variant="link" asChild className="h-auto p-0">
-          <Link href="/">Back to workflows</Link>
+          <Link href="/workflows">Back to workflows</Link>
         </Button>
       </div>
     );
