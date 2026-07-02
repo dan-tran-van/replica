@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRepositories } from "@/components/providers/repository-provider";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function CreateWorkflowForm({ onCreated }: { onCreated?: () => void }) {
   const router = useRouter();
@@ -36,54 +41,41 @@ export function CreateWorkflowForm({ onCreated }: { onCreated?: () => void }) {
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
-      <div>
-        <label
-          htmlFor="workflow-name"
-          className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-        >
-          Workflow name
-        </label>
-        <input
+      <div className="space-y-2">
+        <Label htmlFor="workflow-name">Workflow name</Label>
+        <Input
           id="workflow-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Weekly research digest"
-          className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
         />
       </div>
 
-      <div>
-        <label
-          htmlFor="starter-prompt"
-          className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-        >
-          Starter prompt
-        </label>
-        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+      <div className="space-y-2">
+        <Label htmlFor="starter-prompt">Starter prompt</Label>
+        <p className="text-xs text-muted-foreground">
           Copy this into Manus Scheduled for your first run.
         </p>
-        <textarea
+        <Textarea
           id="starter-prompt"
           value={starterPrompt}
           onChange={(e) => setStarterPrompt(e.target.value)}
           rows={8}
           placeholder="Enter the prompt you'll run in Manus..."
-          className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 font-mono text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+          className="font-mono"
         />
       </div>
 
       {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : null}
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-      >
+      <Button type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Creating…" : "Create workflow"}
-      </button>
+      </Button>
     </form>
   );
 }

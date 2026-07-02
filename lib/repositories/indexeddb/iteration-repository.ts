@@ -35,6 +35,7 @@ export class IndexedDBIterationRepository implements IterationRepository {
       manusOutput: input.manusOutput,
       outcome: input.outcome,
       observations: input.observations,
+      followedPriorRecommendation: input.followedPriorRecommendation,
       analysis: null,
       createdAt: new Date().toISOString(),
     };

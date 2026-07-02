@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useWorkflow } from "@/lib/hooks/use-workflow";
 import { useIterations } from "@/lib/hooks/use-iterations";
 import { LogIterationForm } from "@/components/iterations/log-iteration-form";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function LogIterationPage({
   params,
@@ -16,22 +18,18 @@ export default function LogIterationPage({
   const { data: iterations, isLoading: iterationsLoading } = useIterations(id);
 
   if (isLoading || iterationsLoading) {
-    return (
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">
-        Loading…
-      </p>
-    );
+    return <p className="text-sm text-muted-foreground">Loading…</p>;
   }
 
   if (error || !workflow) {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-red-600 dark:text-red-400">
+        <p className="text-sm text-destructive">
           {error ?? "Workflow not found"}
         </p>
-        <Link href="/" className="text-sm underline">
-          Back to workflows
-        </Link>
+        <Button variant="link" asChild className="h-auto p-0">
+          <Link href="/">Back to workflows</Link>
+        </Button>
       </div>
     );
   }
@@ -39,24 +37,21 @@ export default function LogIterationPage({
   return (
     <div className="space-y-6">
       <div>
-        <Link
-          href={`/workflows/${workflow.id}`}
-          className="text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400"
-        >
-          ← {workflow.name}
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-          Log a run
-        </h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+        <Button variant="link" asChild className="h-auto p-0 text-muted-foreground">
+          <Link href={`/workflows/${workflow.id}`}>← {workflow.name}</Link>
+        </Button>
+        <h1 className="mt-2 text-xl font-semibold">Log a run</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Paste your Manus output and reflect on the result. Replica will
           propose an improved prompt.
         </p>
       </div>
 
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
-        <LogIterationForm workflow={workflow} iterations={iterations} />
-      </div>
+      <Card>
+        <CardContent>
+          <LogIterationForm workflow={workflow} iterations={iterations} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

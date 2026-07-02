@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { toast } from "sonner";
 import { copyToClipboard } from "@/lib/utils/clipboard";
+import { Button } from "@/components/ui/button";
 
 interface CopyButtonProps {
   text: string;
@@ -12,25 +13,26 @@ interface CopyButtonProps {
 export function CopyButton({
   text,
   label = "Copy",
-  className = "",
+  className,
 }: CopyButtonProps) {
-  const [copied, setCopied] = useState(false);
-
   async function handleCopy() {
     const success = await copyToClipboard(text);
     if (success) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      toast.success("Copied to clipboard");
+    } else {
+      toast.error("Failed to copy");
     }
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="sm"
       onClick={() => void handleCopy()}
-      className={`inline-flex items-center rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 ${className}`}
+      className={className}
     >
-      {copied ? "Copied!" : label}
-    </button>
+      {label}
+    </Button>
   );
 }

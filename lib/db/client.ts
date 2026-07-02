@@ -38,7 +38,7 @@ export function getDB(): Promise<IDBPDatabase<ReplicaDB>> {
 
   if (!dbPromise) {
     dbPromise = openDB<ReplicaDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
+      upgrade: async (db, oldVersion) => {
         if (!db.objectStoreNames.contains(STORES.workflows)) {
           const workflowStore = db.createObjectStore(STORES.workflows, {
             keyPath: "id",
@@ -62,6 +62,20 @@ export function getDB(): Promise<IDBPDatabase<ReplicaDB>> {
 
         if (!db.objectStoreNames.contains(STORES.settings)) {
           db.createObjectStore(STORES.settings, { keyPath: "id" });
+        }
+
+        if (oldVersion < 2 && db.objectStoreNames.contains(STORES.iterations)) {
+          const tx = db.transaction(STORES.iterations, "readwrite");
+          const store = tx.objectStore(STORES.iterations);
+          let cursor = await store.openCursor();
+          while (cursor) {
+            const iteration = cursor.value as Iteration;
+            if (!iteration.followedPriorRecommendation) {
+              iteration.followedPriorRecommendation = "not_applicable";
+              await cursor.update(iteration);
+            }
+            cursor = await cursor.continue();
+          }
         }
       },
     });

@@ -1,5 +1,5 @@
 export const DB_NAME = "replica";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const STORES = {
   workflows: "workflows",

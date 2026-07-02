@@ -3,6 +3,9 @@
 import Link from "next/link";
 import type { IterationAnalysis } from "@/lib/domain/types";
 import { CopyButton } from "@/components/shared/copy-button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface AnalysisPanelProps {
   analysis: IterationAnalysis;
@@ -19,73 +22,73 @@ export function AnalysisPanel({
 }: AnalysisPanelProps) {
   if (analysis.status === "failed") {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/40">
-        <p className="text-sm font-medium text-red-800 dark:text-red-300">
-          Analysis failed
-        </p>
-        <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+      <Alert variant="destructive">
+        <AlertTitle>Analysis failed</AlertTitle>
+        <AlertDescription>
           {analysis.errorMessage ?? "An unknown error occurred."}
-        </p>
+        </AlertDescription>
         {onRetry ? (
           <div className="mt-3 flex items-center gap-3">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={onRetry}
               disabled={isRetrying}
-              className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-800 transition-colors hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:bg-red-950 dark:text-red-300"
             >
               {isRetrying ? "Retrying…" : "Retry analysis"}
-            </button>
-            <Link
-              href="/settings"
-              className="text-sm text-red-700 underline dark:text-red-400"
-            >
+            </Button>
+            <Link href="/settings" className="text-sm underline">
               Check API key
             </Link>
           </div>
         ) : null}
-      </div>
+      </Alert>
     );
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-900/50">
+    <div className="space-y-4">
       {wasTruncated ? (
-        <p className="text-xs text-amber-700 dark:text-amber-400">
-          Context was truncated due to length limits. Analysis may be less
-          precise.
-        </p>
+        <Alert>
+          <AlertDescription>
+            Context was truncated due to length limits. Analysis may be less
+            precise.
+          </AlertDescription>
+        </Alert>
       ) : null}
 
-      <div>
-        <div className="flex items-center justify-between gap-2">
-          <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-            Proposed prompt
-          </h4>
+      <Card size="sm">
+        <CardHeader className="flex-row items-center justify-between gap-2">
+          <CardTitle className="text-sm">Proposed prompt</CardTitle>
           <CopyButton text={analysis.proposedPrompt} label="Copy prompt" />
-        </div>
-        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md border border-zinc-200 bg-white p-3 font-mono text-xs text-zinc-800 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
-          {analysis.proposedPrompt}
-        </pre>
-      </div>
+        </CardHeader>
+        <CardContent>
+          <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground">
+            {analysis.proposedPrompt}
+          </pre>
+        </CardContent>
+      </Card>
 
       <div>
-        <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-          Reasoning
-        </h4>
-        <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-600 dark:text-zinc-400">
+        <h4 className="text-sm font-medium">Reasoning</h4>
+        <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
           {analysis.reasoning}
         </p>
       </div>
 
-      <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
-        <h4 className="text-sm font-medium text-emerald-900 dark:text-emerald-300">
-          What to do next
-        </h4>
-        <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-400">
-          {analysis.nextRecommendation}
-        </p>
-      </div>
+      <Card size="sm" className="border-primary/20 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="text-sm text-primary">
+            What to do next
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            {analysis.nextRecommendation}
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

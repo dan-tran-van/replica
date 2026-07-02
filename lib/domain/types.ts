@@ -4,6 +4,12 @@ export type Outcome = "success" | "partial" | "failure";
 
 export type AnalysisStatus = "completed" | "failed";
 
+export type RecommendationAdherence =
+  | "yes"
+  | "partially"
+  | "no"
+  | "not_applicable";
+
 export interface Workflow {
   id: string;
   name: string;
@@ -31,6 +37,7 @@ export interface Iteration {
   manusOutput: string;
   outcome: Outcome;
   observations: string;
+  followedPriorRecommendation: RecommendationAdherence;
   analysis: IterationAnalysis | null;
   createdAt: string;
 }
@@ -66,4 +73,5 @@ export interface CreateIterationInput {
   manusOutput: string;
   outcome: Outcome;
   observations: string;
+  followedPriorRecommendation: RecommendationAdherence;
 }

@@ -20,6 +20,26 @@ export function getLatestAnalysis(
   return null;
 }
 
+export function getPriorRecommendation(iterations: Iteration[]): string | null {
+  const latest = getLatestAnalysis(iterations);
+  return latest?.nextRecommendation ?? null;
+}
+
+export function requiresAdherenceQuestion(iterations: Iteration[]): boolean {
+  return getPriorRecommendation(iterations) !== null;
+}
+
+export function getRecommendationRespondedTo(
+  iteration: Iteration,
+  allIterations: Iteration[],
+): string | null {
+  const prior = allIterations.find(
+    (i) => i.sequenceNumber === iteration.sequenceNumber - 1,
+  );
+  if (!prior?.analysis || prior.analysis.status !== "completed") return null;
+  return prior.analysis.nextRecommendation;
+}
+
 export function getNextSequenceNumber(iterations: Iteration[]): number {
   if (iterations.length === 0) return 1;
   return Math.max(...iterations.map((i) => i.sequenceNumber)) + 1;

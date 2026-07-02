@@ -1,5 +1,9 @@
 import type { Iteration, Workflow } from "@/lib/domain/types";
-import { getLatestPromptUsed } from "@/lib/domain/derive";
+import {
+  getLatestPromptUsed,
+  getPriorRecommendation,
+  getRecommendationRespondedTo,
+} from "@/lib/domain/derive";
 import { truncate, truncateUserMessage } from "@/lib/utils/truncate";
 
 const PRIOR_ITERATION_LIMIT = 10;
@@ -12,7 +16,8 @@ Your job is to help the user evolve their prompt over repeated runs. You receive
 - The prompt actually used in the latest run
 - The Manus output from the latest run
 - The user's reflection (outcome + observations)
-- A history of prior iterations
+- Whether the user followed your prior nextRecommendation (yes / partially / no / not applicable)
+- A history of prior iterations including adherence feedback
 
 Respond with JSON only, matching this schema:
 {
@@ -25,8 +30,18 @@ Guidelines:
 - Preserve what is working; make targeted improvements based on user feedback
 - The proposed prompt must be complete and ready to paste — not a diff or partial edit
 - Reference specific observations from the user when explaining changes
-- Keep nextRecommendation actionable and singular
-- Do not execute tasks or pretend to run Manus`;
+- Keep nextRecommendation actionable, singular, and small enough that a user can realistically follow it before their next log
+- Do not execute tasks or pretend to run Manus
+
+Recommendation adherence feedback:
+- When followedPriorRecommendation is "no" or "partially", prioritize understanding why in your reasoning and adjust nextRecommendation to be clearer, smaller, and more likely to be followed
+- Avoid repeating recommendations the user consistently ignores unless their observations explain a new reason to retry
+- When followedPriorRecommendation is "yes" but outcome is "failure" or "partial", the recommendation may have been followed but was wrong — distinguish "bad advice" from "ignored advice" in your reasoning`;
+
+function formatAdherence(value: Iteration["followedPriorRecommendation"]): string {
+  if (value === "not_applicable") return "n/a";
+  return value;
+}
 
 interface BuildMessagesInput {
   workflow: Workflow;
@@ -43,10 +58,13 @@ export function buildAnalysisMessages({
   user: string;
   wasTruncated: boolean;
 } {
+  const allPriorToCurrent = priorIterations;
   const latestPromptUsed = getLatestPromptUsed(workflow, [
-    ...priorIterations,
+    ...allPriorToCurrent,
     currentIteration,
   ]);
+
+  const priorRecommendationForCurrent = getPriorRecommendation(allPriorToCurrent);
 
   const sortedPrior = [...priorIterations].sort(
     (a, b) => a.sequenceNumber - b.sequenceNumber,
@@ -61,9 +79,18 @@ export function buildAnalysisMessages({
         iteration.analysis?.status === "completed"
           ? iteration.analysis.proposedPrompt
           : "(no analysis)";
+      const respondedTo = getRecommendationRespondedTo(
+        iteration,
+        sortedPrior,
+      );
+      const respondedToLine = respondedTo
+        ? `Prior nextRecommendation: ${truncate(respondedTo, FIELD_TRUNCATE)}`
+        : "Prior nextRecommendation: (none)";
       return `### Iteration ${iteration.sequenceNumber}
 Prompt used: ${truncate(iteration.promptUsed, FIELD_TRUNCATE)}
 Outcome: ${iteration.outcome}
+Followed prior recommendation: ${formatAdherence(iteration.followedPriorRecommendation)}
+${respondedToLine}
 Observations: ${truncate(iteration.observations, FIELD_TRUNCATE)}
 Prior proposed prompt: ${truncate(proposed, FIELD_TRUNCATE)}`;
     })
@@ -75,6 +102,10 @@ Prior proposed prompt: ${truncate(proposed, FIELD_TRUNCATE)}`;
     `## Current iteration (#${currentIteration.sequenceNumber})`,
     `Prompt used: ${currentIteration.promptUsed}`,
     `Outcome: ${currentIteration.outcome}`,
+    `Followed prior recommendation: ${formatAdherence(currentIteration.followedPriorRecommendation)}`,
+    priorRecommendationForCurrent
+      ? `(The recommendation they were responding to: "${priorRecommendationForCurrent}")`
+      : "(No prior recommendation for this run)",
     `Observations: ${currentIteration.observations}`,
     `Manus output:\n${currentIteration.manusOutput}`,
   ];

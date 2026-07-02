@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import type { Iteration, Workflow } from "@/lib/domain/types";
+import { adherenceLabel, AdherenceBadge } from "@/components/shared/adherence-badge";
 import { OutcomeBadge } from "@/components/shared/outcome-badge";
 import { AnalysisPanel } from "./analysis-panel";
 import { analyzeIteration } from "@/lib/ai/analyze-iteration";
 import { useRepositories } from "@/components/providers/repository-provider";
 import { useSettings } from "@/lib/hooks/use-settings";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface IterationCardProps {
   iteration: Iteration;
@@ -48,52 +51,65 @@ export function IterationCard({
   }
 
   const needsRetry =
-    localAnalysis === null ||
-    localAnalysis.status === "failed";
+    localAnalysis === null || localAnalysis.status === "failed";
+
+  const adherenceText = adherenceLabel(iteration.followedPriorRecommendation);
 
   return (
-    <article className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-      >
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-            Run #{iteration.sequenceNumber}
+    <Card size="sm">
+      <CardHeader className="p-0 px-4">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex w-full items-center justify-between gap-3 py-3 text-left"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium">
+              Run #{iteration.sequenceNumber}
+            </span>
+            <OutcomeBadge outcome={iteration.outcome} />
+            <AdherenceBadge adherence={iteration.followedPriorRecommendation} />
+          </div>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {new Date(iteration.createdAt).toLocaleDateString()}
           </span>
-          <OutcomeBadge outcome={iteration.outcome} />
-        </div>
-        <span className="text-xs text-zinc-400">
-          {new Date(iteration.createdAt).toLocaleDateString()}
-        </span>
-      </button>
+        </button>
+      </CardHeader>
 
       {expanded ? (
-        <div className="space-y-4 border-t border-zinc-200 px-4 py-4 dark:border-zinc-800">
+        <CardContent className="space-y-4 border-t pt-4">
+          {adherenceText ? (
+            <div>
+              <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Followed prior recommendation
+              </h4>
+              <p className="mt-1 text-sm">{adherenceText}</p>
+            </div>
+          ) : null}
+
           <div>
-            <h4 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Prompt used
             </h4>
-            <pre className="mt-1 whitespace-pre-wrap font-mono text-xs text-zinc-700 dark:text-zinc-300">
+            <pre className="mt-1 whitespace-pre-wrap font-mono text-xs text-muted-foreground">
               {iteration.promptUsed}
             </pre>
           </div>
 
           <div>
-            <h4 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Observations
             </h4>
-            <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
               {iteration.observations || "(none)"}
             </p>
           </div>
 
           <div>
-            <h4 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Manus output
             </h4>
-            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-xs text-zinc-700 dark:text-zinc-300">
+            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground">
               {iteration.manusOutput}
             </pre>
           </div>
@@ -105,22 +121,25 @@ export function IterationCard({
               isRetrying={isRetrying}
             />
           ) : (
-            <div className="rounded-lg border border-dashed border-zinc-300 p-4 dark:border-zinc-700">
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                Analysis pending or not yet run.
-              </p>
-              <button
-                type="button"
-                onClick={() => void handleRetry()}
-                disabled={isRetrying || !settings?.openaiApiKey}
-                className="mt-2 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50 dark:border-zinc-600"
-              >
-                {isRetrying ? "Analyzing…" : "Run analysis"}
-              </button>
-            </div>
+            <Card size="sm" className="border-dashed">
+              <CardContent className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Analysis pending or not yet run.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleRetry()}
+                  disabled={isRetrying || !settings?.openaiApiKey}
+                >
+                  {isRetrying ? "Analyzing…" : "Run analysis"}
+                </Button>
+              </CardContent>
+            </Card>
           )}
-        </div>
+        </CardContent>
       ) : null}
-    </article>
+    </Card>
   );
 }

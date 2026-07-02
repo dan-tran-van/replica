@@ -4,6 +4,7 @@ import type { Iteration, Workflow } from "@/lib/domain/types";
 import { getLatestAnalysis } from "@/lib/domain/derive";
 import { IterationCard } from "./iteration-card";
 import { CopyButton } from "@/components/shared/copy-button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface IterationTimelineProps {
   workflow: Workflow;
@@ -24,26 +25,28 @@ export function IterationTimeline({
   return (
     <div className="space-y-6">
       {latestAnalysis ? (
-        <section className="rounded-xl border-2 border-emerald-200 bg-emerald-50/50 p-5 dark:border-emerald-900 dark:bg-emerald-950/20">
-          <h2 className="text-sm font-semibold text-emerald-900 dark:text-emerald-300">
-            What to do next
-          </h2>
-          <p className="mt-2 text-sm text-emerald-800 dark:text-emerald-400">
-            {latestAnalysis.nextRecommendation}
-          </p>
-          {latestAnalysis.proposedPrompt ? (
-            <div className="mt-4 flex items-center gap-2">
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-sm text-primary">
+              What to do next
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {latestAnalysis.nextRecommendation}
+            </p>
+            {latestAnalysis.proposedPrompt ? (
               <CopyButton
                 text={latestAnalysis.proposedPrompt}
                 label="Copy latest proposed prompt"
               />
-            </div>
-          ) : null}
-        </section>
+            ) : null}
+          </CardContent>
+        </Card>
       ) : null}
 
       {sorted.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-muted-foreground">
           No runs logged yet. Run your starter prompt in Manus, then log the
           results.
         </p>
