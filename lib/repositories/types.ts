@@ -1,4 +1,9 @@
 import type {
+  CreateMergeSessionInput,
+  MergeResult,
+  MergeSession,
+} from "@/lib/domain/merge-types";
+import type {
   CreateIterationInput,
   CreateWorkflowInput,
   Iteration,
@@ -31,8 +36,17 @@ export interface SettingsRepository {
   save(settings: Settings): Promise<Settings>;
 }
 
+export interface MergeSessionRepository {
+  list(): Promise<MergeSession[]>;
+  get(id: string): Promise<MergeSession | null>;
+  create(input: CreateMergeSessionInput): Promise<MergeSession>;
+  updateResult(id: string, result: MergeResult | null): Promise<MergeSession>;
+  delete(id: string): Promise<void>;
+}
+
 export interface Repositories {
   workflows: WorkflowRepository;
   iterations: IterationRepository;
   settings: SettingsRepository;
+  mergeSessions: MergeSessionRepository;
 }

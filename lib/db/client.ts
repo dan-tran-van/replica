@@ -1,4 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import type { MergeSession } from "@/lib/domain/merge-types";
 import type { Iteration, Settings, Workflow } from "@/lib/domain/types";
 import {
   DB_NAME,
@@ -26,6 +27,13 @@ interface ReplicaDB extends DBSchema {
   settings: {
     key: string;
     value: Settings;
+  };
+  mergeSessions: {
+    key: string;
+    value: MergeSession;
+    indexes: {
+      by_updatedAt: string;
+    };
   };
 }
 
@@ -62,6 +70,16 @@ export function getDB(): Promise<IDBPDatabase<ReplicaDB>> {
 
         if (!db.objectStoreNames.contains(STORES.settings)) {
           db.createObjectStore(STORES.settings, { keyPath: "id" });
+        }
+
+        if (!db.objectStoreNames.contains(STORES.mergeSessions)) {
+          const mergeStore = db.createObjectStore(STORES.mergeSessions, {
+            keyPath: "id",
+          });
+          mergeStore.createIndex(
+            INDEXES.mergeSessionsByUpdatedAt,
+            "updatedAt",
+          );
         }
 
         if (oldVersion < 2 && db.objectStoreNames.contains(STORES.iterations)) {
