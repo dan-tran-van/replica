@@ -1,6 +1,7 @@
 import type { CreateWorkflowInput, Workflow } from "@/lib/domain/types";
 import { getDB } from "@/lib/db/client";
 import { INDEXES, STORES } from "@/lib/db/schema";
+import { normalizeWorkflowRecord } from "@/lib/domain/persistence-compat";
 import type { WorkflowRepository } from "../types";
 
 export class IndexedDBWorkflowRepository implements WorkflowRepository {
@@ -10,12 +11,15 @@ export class IndexedDBWorkflowRepository implements WorkflowRepository {
       STORES.workflows,
       INDEXES.workflowsByUpdatedAt,
     );
-    return workflows.reverse();
+    return workflows
+      .map((workflow) => normalizeWorkflowRecord(workflow))
+      .filter((workflow): workflow is Workflow => workflow !== null)
+      .reverse();
   }
 
   async get(id: string): Promise<Workflow | null> {
     const db = await getDB();
-    return (await db.get(STORES.workflows, id)) ?? null;
+    return normalizeWorkflowRecord(await db.get(STORES.workflows, id));
   }
 
   async create(input: CreateWorkflowInput): Promise<Workflow> {
@@ -31,7 +35,7 @@ export class IndexedDBWorkflowRepository implements WorkflowRepository {
 
     const db = await getDB();
     await db.put(STORES.workflows, workflow);
-    return workflow;
+    return normalizeWorkflowRecord(workflow) ?? workflow;
   }
 
   async delete(id: string): Promise<void> {
@@ -56,7 +60,10 @@ export class IndexedDBWorkflowRepository implements WorkflowRepository {
     const workflow = await db.get(STORES.workflows, id);
     if (!workflow) return;
 
-    workflow.updatedAt = new Date().toISOString();
-    await db.put(STORES.workflows, workflow);
+    const normalized = normalizeWorkflowRecord(workflow);
+    if (!normalized) return;
+
+    normalized.updatedAt = new Date().toISOString();
+    await db.put(STORES.workflows, normalized);
   }
 }

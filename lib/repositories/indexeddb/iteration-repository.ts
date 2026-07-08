@@ -5,6 +5,7 @@ import type {
 } from "@/lib/domain/types";
 import { getDB } from "@/lib/db/client";
 import { INDEXES, STORES } from "@/lib/db/schema";
+import { normalizeIterationRecord } from "@/lib/domain/persistence-compat";
 import type { IterationRepository } from "../types";
 
 export class IndexedDBIterationRepository implements IterationRepository {
@@ -15,17 +16,23 @@ export class IndexedDBIterationRepository implements IterationRepository {
       INDEXES.iterationsByWorkflowId,
       workflowId,
     );
-    return iterations.sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+    return iterations
+      .map((iteration) => normalizeIterationRecord(iteration))
+      .filter((iteration): iteration is Iteration => iteration !== null)
+      .sort((a, b) => a.sequenceNumber - b.sequenceNumber);
   }
 
   async listAll(): Promise<Iteration[]> {
     const db = await getDB();
-    return db.getAll(STORES.iterations);
+    const iterations = await db.getAll(STORES.iterations);
+    return iterations
+      .map((iteration) => normalizeIterationRecord(iteration))
+      .filter((iteration): iteration is Iteration => iteration !== null);
   }
 
   async get(id: string): Promise<Iteration | null> {
     const db = await getDB();
-    return (await db.get(STORES.iterations, id)) ?? null;
+    return normalizeIterationRecord(await db.get(STORES.iterations, id));
   }
 
   async create(
@@ -47,7 +54,7 @@ export class IndexedDBIterationRepository implements IterationRepository {
 
     const db = await getDB();
     await db.put(STORES.iterations, iteration);
-    return iteration;
+    return normalizeIterationRecord(iteration) ?? iteration;
   }
 
   async updateAnalysis(
@@ -60,8 +67,13 @@ export class IndexedDBIterationRepository implements IterationRepository {
       throw new Error(`Iteration ${id} not found`);
     }
 
-    iteration.analysis = analysis;
-    await db.put(STORES.iterations, iteration);
-    return iteration;
+    const normalized = normalizeIterationRecord(iteration);
+    if (!normalized) {
+      throw new Error(`Iteration ${id} is malformed`);
+    }
+
+    normalized.analysis = analysis;
+    await db.put(STORES.iterations, normalized);
+    return normalized;
   }
 }

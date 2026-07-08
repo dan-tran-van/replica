@@ -1,6 +1,7 @@
 import type { MergeResult } from "@/lib/domain/merge-types";
 import type { ResolvedMergeSource } from "@/lib/domain/resolve-merge-sources";
 import type { Settings } from "@/lib/domain/types";
+import { createFailedMergeResult } from "@/lib/domain/persistence-compat";
 import { buildMergeMessages } from "./build-merge-messages";
 import { callOpenAIJson, OpenAIError } from "./openai-client";
 import { mergeReflectionResponseSchema } from "./merge-reflection-schema";
@@ -14,22 +15,7 @@ function emptyFailedResult(
   settings: Settings,
   errorMessage: string,
 ): MergeResult {
-  return {
-    mergedSummary: "",
-    sharedPatterns: [],
-    uniqueFindings: [],
-    conflictsOrTensions: [],
-    missingInformation: [],
-    higherLevelInsight: "",
-    recommendedStrategy: "",
-    proposedPrompt: undefined,
-    nextRecommendation: "",
-    reasoning: "",
-    model: settings.openaiModel,
-    status: "failed",
-    errorMessage,
-    createdAt: new Date().toISOString(),
-  };
+  return createFailedMergeResult(settings, errorMessage);
 }
 
 export async function generateMergeReflection(

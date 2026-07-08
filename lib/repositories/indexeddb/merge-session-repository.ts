@@ -5,6 +5,10 @@ import type {
 } from "@/lib/domain/merge-types";
 import { getDB } from "@/lib/db/client";
 import { INDEXES, STORES } from "@/lib/db/schema";
+import {
+  normalizeMergeResultRecord,
+  normalizeMergeSessionRecord,
+} from "@/lib/domain/persistence-compat";
 import type { MergeSessionRepository } from "../types";
 
 export class IndexedDBMergeSessionRepository implements MergeSessionRepository {
@@ -14,12 +18,15 @@ export class IndexedDBMergeSessionRepository implements MergeSessionRepository {
       STORES.mergeSessions,
       INDEXES.mergeSessionsByUpdatedAt,
     );
-    return sessions.reverse();
+    return sessions
+      .map((session) => normalizeMergeSessionRecord(session))
+      .filter((session): session is MergeSession => session !== null)
+      .reverse();
   }
 
   async get(id: string): Promise<MergeSession | null> {
     const db = await getDB();
-    return (await db.get(STORES.mergeSessions, id)) ?? null;
+    return normalizeMergeSessionRecord(await db.get(STORES.mergeSessions, id));
   }
 
   async create(input: CreateMergeSessionInput): Promise<MergeSession> {
@@ -36,7 +43,7 @@ export class IndexedDBMergeSessionRepository implements MergeSessionRepository {
 
     const db = await getDB();
     await db.put(STORES.mergeSessions, session);
-    return session;
+    return normalizeMergeSessionRecord(session) ?? session;
   }
 
   async updateResult(
@@ -49,10 +56,15 @@ export class IndexedDBMergeSessionRepository implements MergeSessionRepository {
       throw new Error("Merge session not found");
     }
 
-    session.result = result;
-    session.updatedAt = new Date().toISOString();
-    await db.put(STORES.mergeSessions, session);
-    return session;
+    const normalized = normalizeMergeSessionRecord(session);
+    if (!normalized) {
+      throw new Error("Merge session is malformed");
+    }
+
+    normalized.result = result ? normalizeMergeResultRecord(result) ?? result : null;
+    normalized.updatedAt = new Date().toISOString();
+    await db.put(STORES.mergeSessions, normalized);
+    return normalized;
   }
 
   async delete(id: string): Promise<void> {
