@@ -1,11 +1,12 @@
 export const DB_NAME = "replica";
-export const DB_VERSION = 3;
+export const DB_VERSION = 5;
 
 export const STORES = {
   workflows: "workflows",
   iterations: "iterations",
   settings: "settings",
   mergeSessions: "mergeSessions",
+  codingSessions: "codingSessions",
 } as const;
 
 export const INDEXES = {
@@ -13,4 +14,5 @@ export const INDEXES = {
   iterationsByWorkflowId: "by_workflowId",
   iterationsByWorkflowIdSequence: "by_workflowId_sequence",
   mergeSessionsByUpdatedAt: "by_updatedAt",
+  codingSessionsByUpdatedAt: "by_updatedAt",
 } as const;

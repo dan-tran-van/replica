@@ -1,4 +1,15 @@
 import {
+  CODING_ATTEMPT_OUTCOMES,
+  CODING_ATTEMPT_STATUSES,
+  CODING_RECOMMENDED_MODES,
+  type CodingAttempt,
+  type CodingAttemptOutcome,
+  type CodingAttemptStatus,
+  type CodingRecommendedMode,
+  type CodingReflection,
+  type CodingSession,
+} from "@/lib/domain/coding-types";
+import {
   DEFAULT_SETTINGS,
   SETTINGS_ID,
   type Iteration,
@@ -16,6 +27,8 @@ const ADHERENCE_VALUES: RecommendationAdherence[] = [
   "no",
   "not_applicable",
 ];
+
+const CODING_DEFAULT_MODE: CodingRecommendedMode = "investigate";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -46,6 +59,36 @@ function readAdherence(value: unknown): RecommendationAdherence {
     : "not_applicable";
 }
 
+function readCodingRecommendedMode(value: unknown): CodingRecommendedMode {
+  return typeof value === "string" &&
+    CODING_RECOMMENDED_MODES.includes(value as CodingRecommendedMode)
+    ? (value as CodingRecommendedMode)
+    : CODING_DEFAULT_MODE;
+}
+
+function readOptionalCodingRecommendedMode(
+  value: unknown,
+): CodingRecommendedMode | undefined {
+  return typeof value === "string" &&
+    CODING_RECOMMENDED_MODES.includes(value as CodingRecommendedMode)
+    ? (value as CodingRecommendedMode)
+    : undefined;
+}
+
+function readCodingAttemptStatus(value: unknown): CodingAttemptStatus {
+  return typeof value === "string" &&
+    CODING_ATTEMPT_STATUSES.includes(value as CodingAttemptStatus)
+    ? (value as CodingAttemptStatus)
+    : "needsImprovement";
+}
+
+function readCodingAttemptOutcome(value: unknown): CodingAttemptOutcome {
+  return typeof value === "string" &&
+    CODING_ATTEMPT_OUTCOMES.includes(value as CodingAttemptOutcome)
+    ? (value as CodingAttemptOutcome)
+    : "unknown";
+}
+
 function normalizeAnalysis(value: unknown): IterationAnalysis | null {
   if (!isRecord(value)) return null;
 
@@ -58,6 +101,56 @@ function normalizeAnalysis(value: unknown): IterationAnalysis | null {
     status,
     errorMessage: readOptionalString(value.errorMessage),
     createdAt: readIsoString(value.createdAt),
+  };
+}
+
+export function normalizeCodingReflectionRecord(
+  value: unknown,
+): CodingReflection | null {
+  if (!isRecord(value)) return null;
+
+  const status = value.status === "failed" ? "failed" : "completed";
+  return {
+    summary: readString(value.summary),
+    whatWentWrong: readStringArray(value.whatWentWrong),
+    missingContext: readStringArray(value.missingContext),
+    recommendedMode: readCodingRecommendedMode(value.recommendedMode),
+    recommendedModeRationale: readString(value.recommendedModeRationale),
+    betterNextPrompt: readString(value.betterNextPrompt),
+    nextActions: readStringArray(value.nextActions),
+    retryChecklist: readStringArray(value.retryChecklist),
+    tokenWasteReductionReason: readString(value.tokenWasteReductionReason),
+    model: readString(value.model, "unknown"),
+    status,
+    errorMessage: readOptionalString(value.errorMessage),
+    createdAt: readIsoString(value.createdAt),
+  };
+}
+
+function normalizeCodingAttemptRecord(value: unknown): CodingAttempt | null {
+  if (!isRecord(value)) return null;
+
+  const id = readString(value.id);
+  if (!id) return null;
+
+  return {
+    id,
+    toolUsed: readString(value.toolUsed),
+    originalPrompt: readString(value.originalPrompt),
+    aiOutput: readString(value.aiOutput),
+    errorOutput: readString(value.errorOutput),
+    developerNotes: readString(value.developerNotes),
+    resultSummary: readString(value.resultSummary),
+    status: readCodingAttemptStatus(value.status),
+    generatedReflection:
+      value.generatedReflection === null
+        ? null
+        : normalizeCodingReflectionRecord(value.generatedReflection),
+    createdAt: readIsoString(value.createdAt),
+    outcome: readCodingAttemptOutcome(value.outcome),
+    outcomeNotes: readString(value.outcomeNotes),
+    basedOnAttemptId: readOptionalString(value.basedOnAttemptId),
+    recommendedMode: readOptionalCodingRecommendedMode(value.recommendedMode),
   };
 }
 
@@ -217,6 +310,32 @@ export function normalizeMergeSessionRecord(value: unknown): MergeSession | null
   };
 }
 
+export function normalizeCodingSessionRecord(
+  value: unknown,
+): CodingSession | null {
+  if (!isRecord(value)) return null;
+
+  const id = readString(value.id);
+  if (!id) return null;
+
+  const createdAt = readIsoString(value.createdAt);
+  const attempts = Array.isArray(value.attempts)
+    ? value.attempts
+        .map((attempt) => normalizeCodingAttemptRecord(attempt))
+        .filter((attempt): attempt is CodingAttempt => attempt !== null)
+    : [];
+
+  return {
+    id,
+    title: readString(value.title, "Untitled coding session"),
+    taskDescription: readString(value.taskDescription),
+    createdAt,
+    updatedAt: readIsoString(value.updatedAt, createdAt),
+    status: value.status === "resolved" ? "resolved" : "active",
+    attempts,
+  };
+}
+
 export function createFailedMergeResult(
   settings: Settings,
   errorMessage: string,
@@ -232,6 +351,27 @@ export function createFailedMergeResult(
     proposedPrompt: undefined,
     nextRecommendation: "",
     reasoning: "",
+    model: settings.openaiModel,
+    status: "failed",
+    errorMessage,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export function createFailedCodingReflection(
+  settings: Settings,
+  errorMessage: string,
+): CodingReflection {
+  return {
+    summary: "",
+    whatWentWrong: [],
+    missingContext: [],
+    recommendedMode: CODING_DEFAULT_MODE,
+    recommendedModeRationale: "",
+    betterNextPrompt: "",
+    nextActions: [],
+    retryChecklist: [],
+    tokenWasteReductionReason: "",
     model: settings.openaiModel,
     status: "failed",
     errorMessage,

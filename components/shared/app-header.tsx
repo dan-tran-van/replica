@@ -13,6 +13,12 @@ export function AppHeader() {
         </Link>
         <nav className="flex items-center gap-1">
           <Button variant="ghost" size="sm" asChild>
+            <Link href="/workflows">Workflows</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/coding">Coding</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
             <Link href="/merges">Merges</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>

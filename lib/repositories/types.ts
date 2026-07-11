@@ -1,4 +1,12 @@
 import type {
+  CodingAttempt,
+  CodingReflection,
+  CodingSession,
+  CreateCodingAttemptInput,
+  CreateCodingSessionInput,
+  UpdateCodingAttemptOutcomeInput,
+} from "@/lib/domain/coding-types";
+import type {
   CreateMergeSessionInput,
   MergeResult,
   MergeSession,
@@ -44,9 +52,31 @@ export interface MergeSessionRepository {
   delete(id: string): Promise<void>;
 }
 
+export interface CodingSessionRepository {
+  list(): Promise<CodingSession[]>;
+  get(id: string): Promise<CodingSession | null>;
+  create(input: CreateCodingSessionInput): Promise<CodingSession>;
+  addAttempt(
+    sessionId: string,
+    input: CreateCodingAttemptInput,
+  ): Promise<CodingAttempt>;
+  updateAttemptReflection(
+    sessionId: string,
+    attemptId: string,
+    reflection: CodingReflection | null,
+  ): Promise<CodingSession>;
+  updateAttemptOutcome(
+    sessionId: string,
+    attemptId: string,
+    input: UpdateCodingAttemptOutcomeInput,
+  ): Promise<CodingSession>;
+  delete(id: string): Promise<void>;
+}
+
 export interface Repositories {
   workflows: WorkflowRepository;
   iterations: IterationRepository;
   settings: SettingsRepository;
   mergeSessions: MergeSessionRepository;
+  codingSessions: CodingSessionRepository;
 }
