@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRepositories } from "@/components/providers/repository-provider";
@@ -17,9 +17,13 @@ export function CreateCodingSessionForm() {
   const [taskDescription, setTaskDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isSubmittingRef = useRef(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (isSubmittingRef.current) return;
+
     setError(null);
 
     if (!title.trim()) {
@@ -31,6 +35,7 @@ export function CreateCodingSessionForm() {
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsSaving(true);
     try {
       const session = await codingSessions.create({
@@ -39,11 +44,11 @@ export function CreateCodingSessionForm() {
       });
       router.push(`/coding/${session.id}`);
     } catch (err) {
+      isSubmittingRef.current = false;
+      setIsSaving(false);
       setError(
         err instanceof Error ? err.message : "Failed to create coding session",
       );
-    } finally {
-      setIsSaving(false);
     }
   }
 

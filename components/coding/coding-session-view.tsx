@@ -2,6 +2,9 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { Copy01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { toast } from "sonner";
 import type {
   CodingAttempt,
   CodingAttemptOutcome,
@@ -25,6 +28,7 @@ import {
 import { generateCodingReflection } from "@/lib/ai/generate-coding-reflection";
 import { useRepositories } from "@/components/providers/repository-provider";
 import { useSettings } from "@/lib/hooks/use-settings";
+import { copyToClipboard } from "@/lib/utils/clipboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -953,8 +957,12 @@ export function CodingSessionView({
                 disabled={isGeneratingPrompt || !hasApiKey}
               >
                 {isGeneratingPrompt
-                  ? "Generating…"
-                  : "Generate a first prompt"}
+                  ? generatedPrompt?.status === "completed"
+                    ? "Regenerating…"
+                    : "Generating…"
+                  : generatedPrompt?.status === "completed"
+                    ? "Regenerate prompt"
+                    : "Generate a first prompt"}
               </Button>
             </form>
 
@@ -1348,9 +1356,15 @@ function AttemptCard({
                   Based on a generated prompt from an earlier attempt.
                 </p>
               ) : null}
-              <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
-                {attempt.originalPrompt}
-              </pre>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium">Original prompt</span>
+                  <AttemptPromptCopyButton text={attempt.originalPrompt} />
+                </div>
+                <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
+                  {attempt.originalPrompt}
+                </pre>
+              </div>
             </div>
 
             {showDeleteConfirm ? (
@@ -1396,10 +1410,22 @@ function AttemptCard({
             ) : null}
 
             {reflection?.status === "completed" ? (
-              <ReflectionView
-                attempt={attempt}
-                onUseAsNextAttempt={onUseAsNextAttempt}
-              />
+              <>
+                <ReflectionView
+                  attempt={attempt}
+                  onUseAsNextAttempt={onUseAsNextAttempt}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onGenerate}
+                  disabled={!canGenerate || isGenerating}
+                >
+                  {isGenerating
+                    ? "Regenerating…"
+                    : "Regenerate better next prompt"}
+                </Button>
+              </>
             ) : (
               <Button
                 type="button"
@@ -1427,6 +1453,30 @@ function AttemptCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function AttemptPromptCopyButton({ text }: { text: string }) {
+  async function handleCopy() {
+    const success = await copyToClipboard(text);
+    if (success) {
+      toast.success("Prompt copied to clipboard");
+    } else {
+      toast.error("Failed to copy prompt");
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      aria-label="Copy original prompt"
+      title="Copy original prompt"
+      onClick={() => void handleCopy()}
+    >
+      <HugeiconsIcon icon={Copy01Icon} strokeWidth={2} />
+    </Button>
   );
 }
 

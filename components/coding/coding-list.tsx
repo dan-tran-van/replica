@@ -13,10 +13,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/shared/empty-state";
+import { DeleteIconButton } from "@/components/shared/delete-icon-button";
 import { CODING_SESSION_STATUS_LABELS } from "./coding-labels";
 
 export function CodingList() {
-  const { data, isLoading, error } = useCodingSessions();
+  const { data, isLoading, error, remove } = useCodingSessions();
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Loading coding…</p>;
@@ -66,14 +67,23 @@ export function CodingList() {
                 <CardDescription>
                   {session.taskDescription || "No task description"}
                 </CardDescription>
-                <CardAction>
+                <CardAction className="flex items-center gap-1.5">
                   <Badge
                     variant={
                       session.status === "resolved" ? "default" : "secondary"
                     }
+                    className={
+                      session.status === "active"
+                        ? "border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                        : undefined
+                    }
                   >
                     {CODING_SESSION_STATUS_LABELS[session.status]}
                   </Badge>
+                  <DeleteIconButton
+                    itemLabel={`coding session ${session.title}`}
+                    onDelete={() => remove(session.id)}
+                  />
                 </CardAction>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center justify-between gap-3">

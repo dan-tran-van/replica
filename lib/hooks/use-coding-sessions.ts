@@ -53,5 +53,15 @@ export function useCodingSessions() {
     };
   }, [codingSessions]);
 
-  return { data, isLoading, error, refetch };
+  const remove = useCallback(
+    async (id: string) => {
+      await codingSessions.delete(id);
+      setData((sessions) =>
+        sessions.filter((session) => session.id !== id),
+      );
+    },
+    [codingSessions],
+  );
+
+  return { data, isLoading, error, refetch, remove };
 }
