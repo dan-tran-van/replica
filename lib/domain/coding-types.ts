@@ -35,6 +35,14 @@ export const CODING_ATTEMPT_STATUSES = [
 
 export type CodingAttemptStatus = (typeof CODING_ATTEMPT_STATUSES)[number];
 
+export const CODING_ATTEMPT_SOURCES = [
+  "manual",
+  "generatedFromDescription",
+  "generatedFromReflection",
+] as const;
+
+export type CodingAttemptSource = (typeof CODING_ATTEMPT_SOURCES)[number];
+
 export type CodingSessionStatus = "active" | "resolved";
 
 export interface CodingReflection {
@@ -68,6 +76,7 @@ export interface CodingAttempt {
   outcomeNotes: string;
   basedOnAttemptId?: string;
   recommendedMode?: CodingRecommendedMode;
+  source: CodingAttemptSource;
 }
 
 export interface CodingSession {
@@ -95,9 +104,22 @@ export interface CreateCodingAttemptInput {
   status: CodingAttemptStatus;
   basedOnAttemptId?: string;
   recommendedMode?: CodingRecommendedMode;
+  source?: CodingAttemptSource;
 }
 
 export interface UpdateCodingAttemptOutcomeInput {
   outcome: CodingAttemptOutcome;
   outcomeNotes: string;
+}
+
+export interface UpdateCodingAttemptInput {
+  toolUsed: string;
+  originalPrompt: string;
+  aiOutput: string;
+  errorOutput: string;
+  developerNotes: string;
+  resultSummary: string;
+  status: CodingAttemptStatus;
+  recommendedMode?: CodingRecommendedMode;
+  source?: CodingAttemptSource;
 }

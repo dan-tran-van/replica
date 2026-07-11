@@ -4,6 +4,7 @@ import type {
   CodingSession,
   CreateCodingAttemptInput,
   CreateCodingSessionInput,
+  UpdateCodingAttemptInput,
   UpdateCodingAttemptOutcomeInput,
 } from "@/lib/domain/coding-types";
 import type {
@@ -65,11 +66,17 @@ export interface CodingSessionRepository {
     attemptId: string,
     reflection: CodingReflection | null,
   ): Promise<CodingSession>;
+  updateAttempt(
+    sessionId: string,
+    attemptId: string,
+    input: UpdateCodingAttemptInput,
+  ): Promise<CodingSession>;
   updateAttemptOutcome(
     sessionId: string,
     attemptId: string,
     input: UpdateCodingAttemptOutcomeInput,
   ): Promise<CodingSession>;
+  deleteAttempt(sessionId: string, attemptId: string): Promise<CodingSession>;
   delete(id: string): Promise<void>;
 }
 

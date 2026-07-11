@@ -34,7 +34,8 @@ export function CodingList() {
             Reduce wasted AI coding tokens
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Turn failed attempts into better next prompts.
+            Generate a first prompt for a new coding task, or improve a failed
+            coding attempt.
           </p>
         </div>
         <Button asChild>
@@ -43,14 +44,13 @@ export function CodingList() {
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Replica does not replace your coding tool. It helps your next attempt
-        start smarter.
+        Replica helps your next external AI coding run start smarter.
       </p>
 
       {data.length === 0 ? (
         <EmptyState
           title="No coding sessions yet"
-          description="Paste an external AI coding attempt, reflect on what went wrong, and generate a sharper prompt for the next run."
+          description="Describe a new coding task to generate a first prompt, or paste a messy external attempt and generate a sharper next prompt."
           action={
             <Button asChild>
               <Link href="/coding/new">Create your first session</Link>

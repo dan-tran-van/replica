@@ -8,10 +8,14 @@ import type {
   CodingAttemptStatus,
   CodingSession,
   CreateCodingAttemptInput,
+  UpdateCodingAttemptInput,
 } from "@/lib/domain/coding-types";
+import { CODING_ATTEMPT_STATUSES } from "@/lib/domain/coding-types";
 import {
-  CODING_ATTEMPT_STATUSES,
-} from "@/lib/domain/coding-types";
+  generateCodingPrompt,
+  type GeneratedCodingPrompt,
+} from "@/lib/ai/generate-coding-prompt";
+import type { CodingPromptGenerationInput } from "@/lib/ai/build-coding-prompt-generation-messages";
 import { generateCodingReflection } from "@/lib/ai/generate-coding-reflection";
 import { useRepositories } from "@/components/providers/repository-provider";
 import { useSettings } from "@/lib/hooks/use-settings";
@@ -36,6 +40,7 @@ import {
 } from "@/components/ui/select";
 import { CopyButton } from "@/components/shared/copy-button";
 import {
+  CODING_ATTEMPT_SOURCE_LABELS,
   CODING_ATTEMPT_STATUS_LABELS,
   CODING_MODE_LABELS,
   CODING_OUTCOME_LABELS,
@@ -48,6 +53,8 @@ interface CodingSessionViewProps {
 }
 
 type AttemptFormState = CreateCodingAttemptInput;
+type AttemptEditFormState = UpdateCodingAttemptInput;
+type PromptGenerationFormState = CodingPromptGenerationInput;
 
 const EMPTY_FORM: AttemptFormState = {
   toolUsed: "",
@@ -57,6 +64,17 @@ const EMPTY_FORM: AttemptFormState = {
   developerNotes: "",
   resultSummary: "",
   status: "needsImprovement",
+  source: "manual",
+};
+
+const EMPTY_PROMPT_FORM: PromptGenerationFormState = {
+  featureTaskDescription: "",
+  goal: "",
+  relevantContext: "",
+  constraints: "",
+  filesComponents: "",
+  preferredTool: "",
+  notesOrConcerns: "",
 };
 
 const OUTCOME_OPTIONS: CodingAttemptOutcome[] = [
@@ -67,6 +85,20 @@ const OUTCOME_OPTIONS: CodingAttemptOutcome[] = [
   "notHelpful",
   "madeWorse",
 ];
+
+function attemptToEditForm(attempt: CodingAttempt): AttemptEditFormState {
+  return {
+    toolUsed: attempt.toolUsed,
+    originalPrompt: attempt.originalPrompt,
+    aiOutput: attempt.aiOutput,
+    errorOutput: attempt.errorOutput,
+    developerNotes: attempt.developerNotes,
+    resultSummary: attempt.resultSummary,
+    status: attempt.status,
+    recommendedMode: attempt.recommendedMode,
+    source: attempt.source,
+  };
+}
 
 export function CodingSessionView({
   session,
@@ -85,6 +117,19 @@ export function CodingSessionView({
   const [truncatedAttemptId, setTruncatedAttemptId] = useState<string | null>(
     null,
   );
+  const [showPromptGenerator, setShowPromptGenerator] = useState(false);
+  const [showPromptDetails, setShowPromptDetails] = useState(false);
+  const [promptForm, setPromptForm] =
+    useState<PromptGenerationFormState>(EMPTY_PROMPT_FORM);
+  const [generatedPrompt, setGeneratedPrompt] =
+    useState<GeneratedCodingPrompt | null>(null);
+  const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+  const [promptGenerationError, setPromptGenerationError] = useState<
+    string | null
+  >(null);
+  const [promptWasTruncated, setPromptWasTruncated] = useState(false);
+  const [isSavingGeneratedPrompt, setIsSavingGeneratedPrompt] = useState(false);
+  const [generatedPromptSaved, setGeneratedPromptSaved] = useState(false);
 
   function updateForm<K extends keyof AttemptFormState>(
     key: K,
@@ -93,7 +138,16 @@ export function CodingSessionView({
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function updatePromptForm<K extends keyof PromptGenerationFormState>(
+    key: K,
+    value: PromptGenerationFormState[K],
+  ) {
+    setPromptForm((current) => ({ ...current, [key]: value }));
+    setGeneratedPromptSaved(false);
+  }
+
   function hasSupportingContext(input: AttemptFormState): boolean {
+    if ((input.source ?? "manual") !== "manual") return true;
     return Boolean(
       input.aiOutput.trim() ||
         input.errorOutput.trim() ||
@@ -129,6 +183,108 @@ export function CodingSessionView({
     } finally {
       setIsSaving(false);
     }
+  }
+
+  function buildGeneratedPromptNotes(): string {
+    const sections = [
+      ["Feature/task description", promptForm.featureTaskDescription],
+      ["Goal", promptForm.goal],
+      ["Relevant context", promptForm.relevantContext],
+      ["Constraints", promptForm.constraints],
+      ["Files/components involved", promptForm.filesComponents],
+      ["Notes or concerns", promptForm.notesOrConcerns],
+    ]
+      .filter(([, value]) => value.trim())
+      .map(([label, value]) => `${label}:\n${value.trim()}`);
+
+    return sections.join("\n\n");
+  }
+
+  async function handleGeneratePrompt(e: React.FormEvent) {
+    e.preventDefault();
+    setPromptGenerationError(null);
+    setGeneratedPromptSaved(false);
+    setPromptWasTruncated(false);
+
+    if (!promptForm.featureTaskDescription.trim()) {
+      setPromptGenerationError("Feature/task description is required.");
+      return;
+    }
+    if (!settings || !hasApiKey) {
+      setPromptGenerationError(
+        "Add your OpenAI API key in Settings before generating a prompt.",
+      );
+      return;
+    }
+
+    setIsGeneratingPrompt(true);
+    try {
+      const { generated, wasTruncated } = await generateCodingPrompt(
+        session,
+        promptForm,
+        settings,
+      );
+      setGeneratedPrompt(generated);
+      setPromptWasTruncated(wasTruncated);
+      if (generated.status === "failed") {
+        setPromptGenerationError(
+          generated.errorMessage ?? "Prompt generation failed.",
+        );
+      }
+    } catch (err) {
+      setPromptGenerationError(
+        err instanceof Error ? err.message : "Prompt generation failed",
+      );
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
+  }
+
+  async function saveGeneratedPromptToHistory() {
+    if (!generatedPrompt || generatedPrompt.status !== "completed") return;
+
+    setIsSavingGeneratedPrompt(true);
+    setGeneratedPromptSaved(false);
+    setPromptGenerationError(null);
+    try {
+      await repos.codingSessions.addAttempt(session.id, {
+        toolUsed: promptForm.preferredTool,
+        originalPrompt: generatedPrompt.generatedPrompt,
+        aiOutput: "",
+        errorOutput: "",
+        developerNotes: buildGeneratedPromptNotes(),
+        resultSummary: "",
+        status: "needsImprovement",
+        recommendedMode: generatedPrompt.recommendedMode,
+        source: "generatedFromDescription",
+      });
+      setGeneratedPromptSaved(true);
+      onUpdated();
+    } catch (err) {
+      setPromptGenerationError(
+        err instanceof Error ? err.message : "Failed to save generated prompt",
+      );
+    } finally {
+      setIsSavingGeneratedPrompt(false);
+    }
+  }
+
+  function prefillGeneratedPromptAttempt() {
+    if (!generatedPrompt || generatedPrompt.status !== "completed") return;
+
+    setForm({
+      toolUsed: promptForm.preferredTool,
+      originalPrompt: generatedPrompt.generatedPrompt,
+      aiOutput: "",
+      errorOutput: "",
+      developerNotes: buildGeneratedPromptNotes(),
+      resultSummary: "",
+      status: "needsImprovement",
+      recommendedMode: generatedPrompt.recommendedMode,
+      source: "generatedFromDescription",
+    });
+    setFormError(null);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function handleGenerate(attempt: CodingAttempt) {
@@ -176,6 +332,7 @@ export function CodingSessionView({
       status: "needsImprovement",
       basedOnAttemptId: attempt.id,
       recommendedMode: reflection.recommendedMode,
+      source: "generatedFromReflection",
     });
     setFormError(null);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -207,10 +364,173 @@ export function CodingSessionView({
 
       <Alert>
         <AlertDescription>
-          Replica does not replace your coding tool. It helps your next attempt
-          start smarter.
+          Replica helps your next external AI coding run start smarter.
         </AlertDescription>
       </Alert>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center justify-between gap-3">
+            Generate a first prompt
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPromptGenerator((current) => !current)}
+            >
+              {showPromptGenerator ? "Hide" : "Generate prompt"}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        {showPromptGenerator ? (
+          <CardContent className="space-y-5">
+            {!hasApiKey ? (
+              <Alert>
+                <AlertTitle>OpenAI API key required</AlertTitle>
+                <AlertDescription>
+                  Add your key in{" "}
+                  <Link href="/settings" className="underline">
+                    Settings
+                  </Link>{" "}
+                  before generating a prompt.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            <form
+              onSubmit={(e) => void handleGeneratePrompt(e)}
+              className="space-y-5"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="prompt-description">
+                  What do you want the coding tool to do?
+                </Label>
+                <Textarea
+                  id="prompt-description"
+                  value={promptForm.featureTaskDescription}
+                  onChange={(e) =>
+                    updatePromptForm(
+                      "featureTaskDescription",
+                      e.target.value,
+                    )
+                  }
+                  rows={5}
+                  placeholder="Describe the task. Include what to build, fix, refactor, test, or investigate."
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Describe the task. Add details only if they matter.
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-auto p-0"
+                onClick={() => setShowPromptDetails((current) => !current)}
+              >
+                {showPromptDetails ? "Hide optional details" : "Add optional details"}
+              </Button>
+
+              {showPromptDetails ? (
+                <div className="space-y-4 rounded-lg border p-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="prompt-context">Context</Label>
+                      <Textarea
+                        id="prompt-context"
+                        value={promptForm.relevantContext}
+                        onChange={(e) =>
+                          updatePromptForm("relevantContext", e.target.value)
+                        }
+                        rows={3}
+                        placeholder="Relevant behavior, architecture, or prior decisions."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="prompt-files">Files/components</Label>
+                      <Textarea
+                        id="prompt-files"
+                        value={promptForm.filesComponents}
+                        onChange={(e) =>
+                          updatePromptForm("filesComponents", e.target.value)
+                        }
+                        rows={3}
+                        placeholder="Optional paths, components, routes, or modules."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="prompt-constraints">Constraints</Label>
+                      <Textarea
+                        id="prompt-constraints"
+                        value={promptForm.constraints}
+                        onChange={(e) =>
+                          updatePromptForm("constraints", e.target.value)
+                        }
+                        rows={3}
+                        placeholder="Scope limits, style preferences, or things to avoid."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="prompt-tool">Preferred tool</Label>
+                      <Input
+                        id="prompt-tool"
+                        value={promptForm.preferredTool}
+                        onChange={(e) =>
+                          updatePromptForm("preferredTool", e.target.value)
+                        }
+                        placeholder="Optional external coding tool"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="prompt-notes">Notes or concerns</Label>
+                    <Textarea
+                      id="prompt-notes"
+                      value={promptForm.notesOrConcerns}
+                      onChange={(e) =>
+                        updatePromptForm("notesOrConcerns", e.target.value)
+                      }
+                      rows={3}
+                      placeholder="Risks, uncertainty, success criteria, or instructions to emphasize."
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {promptGenerationError ? (
+                <Alert variant="destructive">
+                  <AlertDescription>{promptGenerationError}</AlertDescription>
+                </Alert>
+              ) : null}
+
+              <Button
+                type="submit"
+                disabled={isGeneratingPrompt || !hasApiKey}
+              >
+                {isGeneratingPrompt
+                  ? "Generating…"
+                  : "Generate a first prompt"}
+              </Button>
+            </form>
+
+            {generatedPrompt?.status === "completed" ? (
+              <GeneratedPromptView
+                generated={generatedPrompt}
+                wasTruncated={promptWasTruncated}
+                isSaving={isSavingGeneratedPrompt}
+                wasSaved={generatedPromptSaved}
+                onSave={() => void saveGeneratedPromptToHistory()}
+                onUseAsNextAttempt={prefillGeneratedPromptAttempt}
+              />
+            ) : null}
+          </CardContent>
+        ) : null}
+      </Card>
 
       <div ref={formRef}>
         <Card>
@@ -224,6 +544,15 @@ export function CodingSessionView({
                   <AlertDescription>
                     Prefilled from a generated next prompt. It will be saved
                     only after you submit this form.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+
+              {form.source === "generatedFromDescription" ? (
+                <Alert>
+                  <AlertDescription>
+                    Prefilled from a generated description prompt. It will be
+                    saved only after you submit this form.
                   </AlertDescription>
                 </Alert>
               ) : null}
@@ -261,10 +590,12 @@ export function CodingSessionView({
               </div>
 
               {form.recommendedMode ? (
-                <div className="space-y-2">
-                  <Label>Suggested mode for this run</Label>
+                <div className="flex flex-wrap gap-2">
                   <Badge variant="secondary">
-                    {CODING_MODE_LABELS[form.recommendedMode]}
+                    Suggested mode: {CODING_MODE_LABELS[form.recommendedMode]}
+                  </Badge>
+                  <Badge variant="outline">
+                    {CODING_ATTEMPT_SOURCE_LABELS[form.source ?? "manual"]}
                   </Badge>
                 </div>
               ) : null}
@@ -423,78 +754,410 @@ function AttemptCard({
   onUseAsNextAttempt,
   onUpdated,
 }: AttemptCardProps) {
+  const repos = useRepositories();
   const reflection = attempt.generatedReflection;
+  const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await repos.codingSessions.deleteAttempt(sessionId, attempt.id);
+      onUpdated();
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Failed to delete attempt",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   return (
     <Card size="sm">
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2">
-          Attempt {attemptNumber}
-          <Badge variant="outline">
-            {CODING_ATTEMPT_STATUS_LABELS[attempt.status]}
-          </Badge>
-          {attempt.recommendedMode ? (
-            <Badge variant="secondary">
-              {CODING_MODE_LABELS[attempt.recommendedMode]}
-            </Badge>
-          ) : null}
+      <CardHeader className="flex flex-row items-start justify-between gap-3">
+        <CardTitle className="flex min-w-0 flex-wrap items-center gap-2">
+          <span>Attempt {attemptNumber}</span>
+          {!isEditing ? (
+            <>
+              <Badge variant="outline">
+                {CODING_ATTEMPT_STATUS_LABELS[attempt.status]}
+              </Badge>
+              <Badge variant="secondary">
+                {CODING_ATTEMPT_SOURCE_LABELS[attempt.source]}
+              </Badge>
+              {attempt.recommendedMode ? (
+                <Badge variant="outline">
+                  {CODING_MODE_LABELS[attempt.recommendedMode]}
+                </Badge>
+              ) : null}
+            </>
+          ) : (
+            <Badge variant="secondary">Editing</Badge>
+          )}
         </CardTitle>
+        {!isEditing ? (
+          <div className="flex shrink-0 gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setIsEditing(true);
+                setShowDeleteConfirm(false);
+                setDeleteError(null);
+              }}
+            >
+              Edit
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={() => {
+                setShowDeleteConfirm(true);
+                setDeleteError(null);
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            {attempt.toolUsed || "Tool not specified"} ·{" "}
-            {new Date(attempt.createdAt).toLocaleString()}
-          </p>
-          {attempt.basedOnAttemptId ? (
-            <p className="text-xs text-muted-foreground">
-              Based on a generated prompt from an earlier attempt.
-            </p>
-          ) : null}
-          <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
-            {attempt.originalPrompt}
-          </pre>
-        </div>
-
-        {reflection?.status === "failed" ? (
-          <Alert variant="destructive">
-            <AlertTitle>Reflection failed</AlertTitle>
-            <AlertDescription>
-              {reflection.errorMessage ?? "An unknown error occurred."}
-            </AlertDescription>
-          </Alert>
-        ) : null}
-
-        {reflection?.status === "completed" ? (
-          <ReflectionView
+        {isEditing ? (
+          <AttemptEditForm
+            sessionId={sessionId}
             attempt={attempt}
-            onUseAsNextAttempt={onUseAsNextAttempt}
+            onCancel={() => setIsEditing(false)}
+            onUpdated={() => {
+              setIsEditing(false);
+              onUpdated();
+            }}
           />
         ) : (
-          <Button
-            type="button"
-            onClick={onGenerate}
-            disabled={!canGenerate || isGenerating}
-          >
-            {isGenerating ? "Generating…" : "Generate better next prompt"}
-          </Button>
+          <>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                {attempt.toolUsed || "Tool not specified"} ·{" "}
+                {new Date(attempt.createdAt).toLocaleString()}
+              </p>
+              {attempt.basedOnAttemptId ? (
+                <p className="text-xs text-muted-foreground">
+                  Based on a generated prompt from an earlier attempt.
+                </p>
+              ) : null}
+              <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
+                {attempt.originalPrompt}
+              </pre>
+            </div>
+
+            {showDeleteConfirm ? (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  Delete this attempt? This cannot be undone.
+                </AlertDescription>
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => void handleDelete()}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? "Deleting…" : "Yes, delete"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDeleteConfirm(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </Alert>
+            ) : null}
+
+            {deleteError ? (
+              <Alert variant="destructive">
+                <AlertDescription>{deleteError}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            {reflection?.status === "failed" ? (
+              <Alert variant="destructive">
+                <AlertTitle>Reflection failed</AlertTitle>
+                <AlertDescription>
+                  {reflection.errorMessage ?? "An unknown error occurred."}
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            {reflection?.status === "completed" ? (
+              <ReflectionView
+                attempt={attempt}
+                onUseAsNextAttempt={onUseAsNextAttempt}
+              />
+            ) : (
+              <Button
+                type="button"
+                onClick={onGenerate}
+                disabled={!canGenerate || isGenerating}
+              >
+                {isGenerating ? "Generating…" : "Generate better next prompt"}
+              </Button>
+            )}
+
+            {wasTruncated ? (
+              <Alert>
+                <AlertDescription>
+                  Some attempt history was truncated due to length limits.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
+            <AttemptFeedback
+              sessionId={sessionId}
+              attempt={attempt}
+              onUpdated={onUpdated}
+            />
+          </>
         )}
-
-        {wasTruncated ? (
-          <Alert>
-            <AlertDescription>
-              Some attempt history was truncated due to length limits.
-            </AlertDescription>
-          </Alert>
-        ) : null}
-
-        <AttemptFeedback
-          sessionId={sessionId}
-          attempt={attempt}
-          onUpdated={onUpdated}
-        />
       </CardContent>
     </Card>
+  );
+}
+
+function AttemptEditForm({
+  sessionId,
+  attempt,
+  onCancel,
+  onUpdated,
+}: {
+  sessionId: string;
+  attempt: CodingAttempt;
+  onCancel: () => void;
+  onUpdated: () => void;
+}) {
+  const repos = useRepositories();
+  const [form, setForm] = useState<AttemptEditFormState>(
+    attemptToEditForm(attempt),
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function updateForm<K extends keyof AttemptEditFormState>(
+    key: K,
+    value: AttemptEditFormState[K],
+  ) {
+    setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (!form.originalPrompt.trim()) {
+      setError("Original prompt is required.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await repos.codingSessions.updateAttempt(sessionId, attempt.id, form);
+      onUpdated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update attempt");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor={`edit-tool-${attempt.id}`}>Tool used</Label>
+          <Input
+            id={`edit-tool-${attempt.id}`}
+            value={form.toolUsed}
+            onChange={(e) => updateForm("toolUsed", e.target.value)}
+            placeholder="e.g. external AI coding tool"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={`edit-status-${attempt.id}`}>Attempt status</Label>
+          <Select
+            value={form.status}
+            onValueChange={(value) =>
+              updateForm("status", value as CodingAttemptStatus)
+            }
+          >
+            <SelectTrigger id={`edit-status-${attempt.id}`} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CODING_ATTEMPT_STATUSES.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {CODING_ATTEMPT_STATUS_LABELS[status]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="secondary">
+          {CODING_ATTEMPT_SOURCE_LABELS[form.source ?? attempt.source]}
+        </Badge>
+        {form.recommendedMode ? (
+          <Badge variant="outline">{CODING_MODE_LABELS[form.recommendedMode]}</Badge>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor={`edit-prompt-${attempt.id}`}>Original prompt</Label>
+        <Textarea
+          id={`edit-prompt-${attempt.id}`}
+          value={form.originalPrompt}
+          onChange={(e) => updateForm("originalPrompt", e.target.value)}
+          rows={7}
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor={`edit-output-${attempt.id}`}>AI output</Label>
+        <Textarea
+          id={`edit-output-${attempt.id}`}
+          value={form.aiOutput}
+          onChange={(e) => updateForm("aiOutput", e.target.value)}
+          rows={4}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor={`edit-errors-${attempt.id}`}>Error output</Label>
+        <Textarea
+          id={`edit-errors-${attempt.id}`}
+          value={form.errorOutput}
+          onChange={(e) => updateForm("errorOutput", e.target.value)}
+          rows={4}
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor={`edit-notes-${attempt.id}`}>Developer notes</Label>
+          <Textarea
+            id={`edit-notes-${attempt.id}`}
+            value={form.developerNotes}
+            onChange={(e) => updateForm("developerNotes", e.target.value)}
+            rows={4}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor={`edit-summary-${attempt.id}`}>Result summary</Label>
+          <Textarea
+            id={`edit-summary-${attempt.id}`}
+            value={form.resultSummary}
+            onChange={(e) => updateForm("resultSummary", e.target.value)}
+            rows={4}
+          />
+        </div>
+      </div>
+
+      {error ? (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? "Saving…" : "Save changes"}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function GeneratedPromptView({
+  generated,
+  wasTruncated,
+  isSaving,
+  wasSaved,
+  onSave,
+  onUseAsNextAttempt,
+}: {
+  generated: GeneratedCodingPrompt;
+  wasTruncated: boolean;
+  isSaving: boolean;
+  wasSaved: boolean;
+  onSave: () => void;
+  onUseAsNextAttempt: () => void;
+}) {
+  return (
+    <div className="space-y-4 rounded-lg border p-4">
+      <div className="space-y-2">
+        <Badge variant="secondary">
+          Recommended next run mode:{" "}
+          {CODING_MODE_LABELS[generated.recommendedMode]}
+        </Badge>
+        <p className="text-sm text-muted-foreground">
+          {generated.recommendedModeRationale}
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium">Generated prompt</h3>
+          <CopyButton text={generated.generatedPrompt} label="Copy prompt" />
+        </div>
+        <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
+          {generated.generatedPrompt}
+        </pre>
+      </div>
+
+      <ReflectionList title="Next actions" items={generated.nextActions} />
+      <ReflectionList title="Retry checklist" items={generated.retryChecklist} />
+      <ReflectionText
+        title="Why this may reduce token waste"
+        text={generated.tokenWasteReductionReason}
+      />
+
+      {wasTruncated ? (
+        <Alert>
+          <AlertDescription>
+            Some same-session history was truncated due to length limits.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onSave}
+          disabled={isSaving}
+        >
+          {isSaving ? "Saving…" : "Save to attempt history"}
+        </Button>
+        <Button type="button" variant="outline" onClick={onUseAsNextAttempt}>
+          Use as next attempt
+        </Button>
+        {wasSaved ? <span className="text-sm text-primary">Saved</span> : null}
+      </div>
+    </div>
   );
 }
 

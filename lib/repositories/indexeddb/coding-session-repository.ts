@@ -4,6 +4,7 @@ import type {
   CodingSession,
   CreateCodingAttemptInput,
   CreateCodingSessionInput,
+  UpdateCodingAttemptInput,
   UpdateCodingAttemptOutcomeInput,
 } from "@/lib/domain/coding-types";
 import { getDB } from "@/lib/db/client";
@@ -73,6 +74,7 @@ export class IndexedDBCodingSessionRepository
       outcomeNotes: "",
       basedOnAttemptId: input.basedOnAttemptId,
       recommendedMode: input.recommendedMode,
+      source: input.source ?? "manual",
     };
 
     const updated: CodingSession = {
@@ -97,7 +99,7 @@ export class IndexedDBCodingSessionRepository
       ? normalizeCodingReflectionRecord(reflection) ?? reflection
       : null;
 
-    const updated = this.updateAttempt(session, attemptId, (attempt) => ({
+    const updated = this.updateAttemptRecord(session, attemptId, (attempt) => ({
       ...attempt,
       generatedReflection: normalizedReflection,
     }));
@@ -113,7 +115,7 @@ export class IndexedDBCodingSessionRepository
   ): Promise<CodingSession> {
     const db = await getDB();
     const session = await this.getRequiredSession(sessionId);
-    const updated = this.updateAttempt(session, attemptId, (attempt) => ({
+    const updated = this.updateAttemptRecord(session, attemptId, (attempt) => ({
       ...attempt,
       outcome: input.outcome,
       outcomeNotes: input.outcomeNotes.trim(),
@@ -129,6 +131,58 @@ export class IndexedDBCodingSessionRepository
 
     await db.put(STORES.codingSessions, sessionWithStatus);
     return sessionWithStatus;
+  }
+
+  async updateAttempt(
+    sessionId: string,
+    attemptId: string,
+    input: UpdateCodingAttemptInput,
+  ): Promise<CodingSession> {
+    const db = await getDB();
+    const session = await this.getRequiredSession(sessionId);
+    const updated = this.updateAttemptRecord(session, attemptId, (attempt) => ({
+      ...attempt,
+      toolUsed: input.toolUsed.trim(),
+      originalPrompt: input.originalPrompt.trim(),
+      aiOutput: input.aiOutput.trim(),
+      errorOutput: input.errorOutput.trim(),
+      developerNotes: input.developerNotes.trim(),
+      resultSummary: input.resultSummary.trim(),
+      status: input.status,
+      recommendedMode: input.recommendedMode,
+      source: input.source ?? attempt.source,
+    }));
+
+    await db.put(STORES.codingSessions, updated);
+    return updated;
+  }
+
+  async deleteAttempt(
+    sessionId: string,
+    attemptId: string,
+  ): Promise<CodingSession> {
+    const db = await getDB();
+    const session = await this.getRequiredSession(sessionId);
+    const attempts = session.attempts.filter(
+      (attempt) => attempt.id !== attemptId,
+    );
+
+    if (attempts.length === session.attempts.length) {
+      throw new Error("Coding attempt not found");
+    }
+
+    const hasFixedAttempt = attempts.some(
+      (attempt) => attempt.outcome === "fixed",
+    );
+    const updated: CodingSession = {
+      ...session,
+      attempts,
+      status: hasFixedAttempt ? "resolved" : "active",
+      updatedAt: new Date().toISOString(),
+    };
+
+    await db.put(STORES.codingSessions, updated);
+    return updated;
   }
 
   async delete(id: string): Promise<void> {
@@ -147,7 +201,7 @@ export class IndexedDBCodingSessionRepository
     return session;
   }
 
-  private updateAttempt(
+  private updateAttemptRecord(
     session: CodingSession,
     attemptId: string,
     update: (attempt: CodingAttempt) => CodingAttempt,

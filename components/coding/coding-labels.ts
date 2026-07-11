@@ -1,5 +1,6 @@
 import type {
   CodingAttemptOutcome,
+  CodingAttemptSource,
   CodingAttemptStatus,
   CodingRecommendedMode,
   CodingSessionStatus,
@@ -41,4 +42,11 @@ export const CODING_SESSION_STATUS_LABELS: Record<CodingSessionStatus, string> =
   {
     active: "Active",
     resolved: "Resolved",
+  };
+
+export const CODING_ATTEMPT_SOURCE_LABELS: Record<CodingAttemptSource, string> =
+  {
+    manual: "Manual",
+    generatedFromDescription: "Generated from description",
+    generatedFromReflection: "Generated from reflection",
   };

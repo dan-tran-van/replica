@@ -1,9 +1,11 @@
 import {
   CODING_ATTEMPT_OUTCOMES,
+  CODING_ATTEMPT_SOURCES,
   CODING_ATTEMPT_STATUSES,
   CODING_RECOMMENDED_MODES,
   type CodingAttempt,
   type CodingAttemptOutcome,
+  type CodingAttemptSource,
   type CodingAttemptStatus,
   type CodingRecommendedMode,
   type CodingReflection,
@@ -89,6 +91,13 @@ function readCodingAttemptOutcome(value: unknown): CodingAttemptOutcome {
     : "unknown";
 }
 
+function readCodingAttemptSource(value: unknown): CodingAttemptSource {
+  return typeof value === "string" &&
+    CODING_ATTEMPT_SOURCES.includes(value as CodingAttemptSource)
+    ? (value as CodingAttemptSource)
+    : "manual";
+}
+
 function normalizeAnalysis(value: unknown): IterationAnalysis | null {
   if (!isRecord(value)) return null;
 
@@ -151,6 +160,7 @@ function normalizeCodingAttemptRecord(value: unknown): CodingAttempt | null {
     outcomeNotes: readString(value.outcomeNotes),
     basedOnAttemptId: readOptionalString(value.basedOnAttemptId),
     recommendedMode: readOptionalCodingRecommendedMode(value.recommendedMode),
+    source: readCodingAttemptSource(value.source),
   };
 }
 
