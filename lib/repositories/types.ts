@@ -6,6 +6,7 @@ import type {
   CreateCodingSessionInput,
   UpdateCodingAttemptInput,
   UpdateCodingAttemptOutcomeInput,
+  UpdateCodingSessionContextInput,
 } from "@/lib/domain/coding-types";
 import type {
   CreateMergeSessionInput,
@@ -76,6 +77,11 @@ export interface CodingSessionRepository {
     attemptId: string,
     input: UpdateCodingAttemptOutcomeInput,
   ): Promise<CodingSession>;
+  updateContext(
+    sessionId: string,
+    input: UpdateCodingSessionContextInput,
+  ): Promise<CodingSession>;
+  clearContext(sessionId: string): Promise<CodingSession>;
   deleteAttempt(sessionId: string, attemptId: string): Promise<CodingSession>;
   delete(id: string): Promise<void>;
 }

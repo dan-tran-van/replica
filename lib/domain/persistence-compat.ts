@@ -3,6 +3,7 @@ import {
   CODING_ATTEMPT_SOURCES,
   CODING_ATTEMPT_STATUSES,
   CODING_RECOMMENDED_MODES,
+  CODING_SESSION_CONTEXT_SOURCES,
   type CodingAttempt,
   type CodingAttemptOutcome,
   type CodingAttemptSource,
@@ -10,6 +11,8 @@ import {
   type CodingRecommendedMode,
   type CodingReflection,
   type CodingSession,
+  type CodingSessionContext,
+  type CodingSessionContextSource,
 } from "@/lib/domain/coding-types";
 import {
   DEFAULT_SETTINGS,
@@ -98,6 +101,15 @@ function readCodingAttemptSource(value: unknown): CodingAttemptSource {
     : "manual";
 }
 
+function readCodingSessionContextSource(
+  value: unknown,
+): CodingSessionContextSource {
+  return typeof value === "string" &&
+    CODING_SESSION_CONTEXT_SOURCES.includes(value as CodingSessionContextSource)
+    ? (value as CodingSessionContextSource)
+    : "manual";
+}
+
 function normalizeAnalysis(value: unknown): IterationAnalysis | null {
   if (!isRecord(value)) return null;
 
@@ -161,6 +173,44 @@ function normalizeCodingAttemptRecord(value: unknown): CodingAttempt | null {
     basedOnAttemptId: readOptionalString(value.basedOnAttemptId),
     recommendedMode: readOptionalCodingRecommendedMode(value.recommendedMode),
     source: readCodingAttemptSource(value.source),
+  };
+}
+
+export function normalizeCodingSessionContextRecord(
+  value: unknown,
+): CodingSessionContext | null {
+  if (!isRecord(value)) return null;
+
+  const summary = readString(value.summary);
+  const notes = readString(value.notes);
+  const goals = readStringArray(value.goals);
+  const constraints = readStringArray(value.constraints);
+  const relevantFiles = readStringArray(value.relevantFiles);
+  const assumptions = readStringArray(value.assumptions);
+
+  if (
+    !summary &&
+    !notes &&
+    goals.length === 0 &&
+    constraints.length === 0 &&
+    relevantFiles.length === 0 &&
+    assumptions.length === 0
+  ) {
+    return null;
+  }
+
+  const createdAt = readIsoString(value.createdAt);
+  return {
+    summary,
+    goals,
+    constraints,
+    relevantFiles,
+    assumptions,
+    notes,
+    source: readCodingSessionContextSource(value.source),
+    model: readOptionalString(value.model),
+    createdAt,
+    updatedAt: readIsoString(value.updatedAt, createdAt),
   };
 }
 
@@ -342,6 +392,7 @@ export function normalizeCodingSessionRecord(
     createdAt,
     updatedAt: readIsoString(value.updatedAt, createdAt),
     status: value.status === "resolved" ? "resolved" : "active",
+    sessionContext: normalizeCodingSessionContextRecord(value.sessionContext),
     attempts,
   };
 }

@@ -6,9 +6,11 @@ import type {
   CodingAttempt,
   CodingAttemptOutcome,
   CodingAttemptStatus,
+  CodingSessionContext,
   CodingSession,
   CreateCodingAttemptInput,
   UpdateCodingAttemptInput,
+  UpdateCodingSessionContextInput,
 } from "@/lib/domain/coding-types";
 import { CODING_ATTEMPT_STATUSES } from "@/lib/domain/coding-types";
 import {
@@ -16,6 +18,10 @@ import {
   type GeneratedCodingPrompt,
 } from "@/lib/ai/generate-coding-prompt";
 import type { CodingPromptGenerationInput } from "@/lib/ai/build-coding-prompt-generation-messages";
+import {
+  generateCodingSessionContext,
+  type GeneratedCodingSessionContext,
+} from "@/lib/ai/generate-coding-session-context";
 import { generateCodingReflection } from "@/lib/ai/generate-coding-reflection";
 import { useRepositories } from "@/components/providers/repository-provider";
 import { useSettings } from "@/lib/hooks/use-settings";
@@ -55,6 +61,14 @@ interface CodingSessionViewProps {
 type AttemptFormState = CreateCodingAttemptInput;
 type AttemptEditFormState = UpdateCodingAttemptInput;
 type PromptGenerationFormState = CodingPromptGenerationInput;
+type SessionContextFormState = {
+  summary: string;
+  goals: string;
+  constraints: string;
+  relevantFiles: string;
+  assumptions: string;
+  notes: string;
+};
 
 const EMPTY_FORM: AttemptFormState = {
   toolUsed: "",
@@ -77,6 +91,15 @@ const EMPTY_PROMPT_FORM: PromptGenerationFormState = {
   notesOrConcerns: "",
 };
 
+const EMPTY_CONTEXT_FORM: SessionContextFormState = {
+  summary: "",
+  goals: "",
+  constraints: "",
+  relevantFiles: "",
+  assumptions: "",
+  notes: "",
+};
+
 const OUTCOME_OPTIONS: CodingAttemptOutcome[] = [
   "notRun",
   "helpful",
@@ -85,6 +108,61 @@ const OUTCOME_OPTIONS: CodingAttemptOutcome[] = [
   "notHelpful",
   "madeWorse",
 ];
+
+function parseLines(value: string): string[] {
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function formatLines(items: string[]): string {
+  return items.join("\n");
+}
+
+function contextToForm(
+  context: CodingSessionContext | null,
+): SessionContextFormState {
+  if (!context) return EMPTY_CONTEXT_FORM;
+  return {
+    summary: context.summary,
+    goals: formatLines(context.goals),
+    constraints: formatLines(context.constraints),
+    relevantFiles: formatLines(context.relevantFiles),
+    assumptions: formatLines(context.assumptions),
+    notes: context.notes,
+  };
+}
+
+function generatedContextToForm(
+  context: GeneratedCodingSessionContext,
+): SessionContextFormState {
+  return {
+    summary: context.summary,
+    goals: formatLines(context.goals),
+    constraints: formatLines(context.constraints),
+    relevantFiles: formatLines(context.relevantFiles),
+    assumptions: formatLines(context.assumptions),
+    notes: context.notes,
+  };
+}
+
+function formToContextInput(
+  form: SessionContextFormState,
+  source: UpdateCodingSessionContextInput["source"] = "manual",
+  model?: string,
+): UpdateCodingSessionContextInput {
+  return {
+    summary: form.summary,
+    goals: parseLines(form.goals),
+    constraints: parseLines(form.constraints),
+    relevantFiles: parseLines(form.relevantFiles),
+    assumptions: parseLines(form.assumptions),
+    notes: form.notes,
+    source,
+    model,
+  };
+}
 
 function attemptToEditForm(attempt: CodingAttempt): AttemptEditFormState {
   return {
@@ -130,6 +208,20 @@ export function CodingSessionView({
   const [promptWasTruncated, setPromptWasTruncated] = useState(false);
   const [isSavingGeneratedPrompt, setIsSavingGeneratedPrompt] = useState(false);
   const [generatedPromptSaved, setGeneratedPromptSaved] = useState(false);
+  const [showContextForm, setShowContextForm] = useState(false);
+  const [contextForm, setContextForm] = useState<SessionContextFormState>(() =>
+    contextToForm(session.sessionContext),
+  );
+  const [contextNotes, setContextNotes] = useState("");
+  const [generatedContext, setGeneratedContext] =
+    useState<GeneratedCodingSessionContext | null>(null);
+  const [isSavingContext, setIsSavingContext] = useState(false);
+  const [isGeneratingContext, setIsGeneratingContext] = useState(false);
+  const [contextWasTruncated, setContextWasTruncated] = useState(false);
+  const [contextError, setContextError] = useState<string | null>(null);
+  const [contextSaved, setContextSaved] = useState(false);
+  const [showContextDeleteConfirm, setShowContextDeleteConfirm] =
+    useState(false);
 
   function updateForm<K extends keyof AttemptFormState>(
     key: K,
@@ -144,6 +236,118 @@ export function CodingSessionView({
   ) {
     setPromptForm((current) => ({ ...current, [key]: value }));
     setGeneratedPromptSaved(false);
+  }
+
+  function updateContextForm<K extends keyof SessionContextFormState>(
+    key: K,
+    value: SessionContextFormState[K],
+  ) {
+    setContextForm((current) => ({ ...current, [key]: value }));
+    setContextSaved(false);
+  }
+
+  function hasContextContent(input: SessionContextFormState): boolean {
+    return Boolean(
+      input.summary.trim() ||
+        input.goals.trim() ||
+        input.constraints.trim() ||
+        input.relevantFiles.trim() ||
+        input.assumptions.trim() ||
+        input.notes.trim(),
+    );
+  }
+
+  async function handleSaveContext(source: UpdateCodingSessionContextInput["source"] = "manual") {
+    setContextError(null);
+    setContextSaved(false);
+
+    if (!hasContextContent(contextForm)) {
+      setContextError("Add session context before saving.");
+      return;
+    }
+
+    setIsSavingContext(true);
+    try {
+      await repos.codingSessions.updateContext(
+        session.id,
+        formToContextInput(
+          contextForm,
+          source,
+          source === "generated" ? generatedContext?.model : undefined,
+        ),
+      );
+      setShowContextForm(false);
+      setShowContextDeleteConfirm(false);
+      setContextSaved(true);
+      setGeneratedContext(null);
+      onUpdated();
+    } catch (err) {
+      setContextError(
+        err instanceof Error ? err.message : "Failed to save session context",
+      );
+    } finally {
+      setIsSavingContext(false);
+    }
+  }
+
+  async function handleGenerateContext() {
+    setContextError(null);
+    setContextSaved(false);
+    setContextWasTruncated(false);
+
+    if (!settings || !hasApiKey) {
+      setContextError(
+        "Add your OpenAI API key in Settings before generating context.",
+      );
+      return;
+    }
+
+    setIsGeneratingContext(true);
+    try {
+      const { generated, wasTruncated } = await generateCodingSessionContext(
+        session,
+        { notes: contextNotes },
+        settings,
+      );
+      setGeneratedContext(generated);
+      setContextWasTruncated(wasTruncated);
+      if (generated.status === "completed") {
+        setContextForm(generatedContextToForm(generated));
+        setShowContextForm(true);
+      } else {
+        setGeneratedContext(null);
+        setContextError(
+          generated.errorMessage ?? "Session context generation failed.",
+        );
+      }
+    } catch (err) {
+      setContextError(
+        err instanceof Error ? err.message : "Session context generation failed",
+      );
+    } finally {
+      setIsGeneratingContext(false);
+    }
+  }
+
+  async function handleClearContext() {
+    setContextError(null);
+    setIsSavingContext(true);
+    try {
+      await repos.codingSessions.clearContext(session.id);
+      setContextForm(EMPTY_CONTEXT_FORM);
+      setContextNotes("");
+      setGeneratedContext(null);
+      setShowContextForm(false);
+      setShowContextDeleteConfirm(false);
+      setContextSaved(false);
+      onUpdated();
+    } catch (err) {
+      setContextError(
+        err instanceof Error ? err.message : "Failed to delete session context",
+      );
+    } finally {
+      setIsSavingContext(false);
+    }
   }
 
   function hasSupportingContext(input: AttemptFormState): boolean {
@@ -367,6 +571,242 @@ export function CodingSessionView({
           Replica helps your next external AI coding run start smarter.
         </AlertDescription>
       </Alert>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center justify-between gap-3">
+            Session context
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setContextForm(contextToForm(session.sessionContext));
+                  setShowContextForm((current) => !current);
+                  setContextError(null);
+                  setContextSaved(false);
+                }}
+              >
+                {showContextForm
+                  ? "Hide"
+                  : session.sessionContext
+                    ? "Edit context"
+                    : "Add context"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleGenerateContext()}
+                disabled={isGeneratingContext || !hasApiKey}
+              >
+                {isGeneratingContext ? "Generating…" : "Generate context"}
+              </Button>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <p className="text-sm text-muted-foreground">
+            Saved context is used for every prompt generation in this session.
+          </p>
+
+          {!hasApiKey ? (
+            <Alert>
+              <AlertTitle>OpenAI API key required for generation</AlertTitle>
+              <AlertDescription>
+                You can still add context manually, or add your key in{" "}
+                <Link href="/settings" className="underline">
+                  Settings
+                </Link>{" "}
+                before generating it.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {session.sessionContext && !showContextForm ? (
+            <SessionContextPreview context={session.sessionContext} />
+          ) : null}
+
+          {!session.sessionContext && !showContextForm ? (
+            <p className="text-sm text-muted-foreground">
+              No session context saved yet. Add durable task details once, then
+              Replica will use them in future generated prompts and
+              reflections.
+            </p>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label htmlFor="context-generation-notes">
+              Notes for generated context
+            </Label>
+            <Textarea
+              id="context-generation-notes"
+              value={contextNotes}
+              onChange={(e) => setContextNotes(e.target.value)}
+              rows={3}
+              placeholder="Optional: add extra background, current uncertainty, or context you want Replica to preserve."
+            />
+          </div>
+
+          {contextWasTruncated ? (
+            <Alert>
+              <AlertDescription>
+                Some same-session history was truncated while generating
+                context.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+
+          {showContextForm ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSaveContext(generatedContext ? "generated" : "manual");
+              }}
+              className="space-y-4 rounded-lg border p-4"
+            >
+              {generatedContext?.status === "completed" ? (
+                <Alert>
+                  <AlertDescription>
+                    Review the generated context, edit anything that is wrong,
+                    then save it to this Coding session.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+
+              <div className="space-y-2">
+                <Label htmlFor="context-summary">Summary</Label>
+                <Textarea
+                  id="context-summary"
+                  value={contextForm.summary}
+                  onChange={(e) =>
+                    updateContextForm("summary", e.target.value)
+                  }
+                  rows={4}
+                  placeholder="Durable task background, product intent, current problem, and anything future prompts should know."
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ContextTextarea
+                  id="context-goals"
+                  label="Goals"
+                  value={contextForm.goals}
+                  onChange={(value) => updateContextForm("goals", value)}
+                  placeholder="One goal per line."
+                />
+                <ContextTextarea
+                  id="context-files"
+                  label="Files/components"
+                  value={contextForm.relevantFiles}
+                  onChange={(value) =>
+                    updateContextForm("relevantFiles", value)
+                  }
+                  placeholder="One path, component, route, or module per line."
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ContextTextarea
+                  id="context-constraints"
+                  label="Constraints"
+                  value={contextForm.constraints}
+                  onChange={(value) => updateContextForm("constraints", value)}
+                  placeholder="One scope limit, requirement, or non-goal per line."
+                />
+                <ContextTextarea
+                  id="context-assumptions"
+                  label="Assumptions"
+                  value={contextForm.assumptions}
+                  onChange={(value) => updateContextForm("assumptions", value)}
+                  placeholder="One unknown or assumption to verify per line."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="context-notes">Notes</Label>
+                <Textarea
+                  id="context-notes"
+                  value={contextForm.notes}
+                  onChange={(e) => updateContextForm("notes", e.target.value)}
+                  rows={4}
+                  placeholder="Extra reusable notes for future generated prompts."
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="submit" disabled={isSavingContext}>
+                  {isSavingContext ? "Saving…" : "Save context"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowContextForm(false);
+                    setContextForm(contextToForm(session.sessionContext));
+                    setGeneratedContext(null);
+                    setContextError(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          ) : null}
+
+          {session.sessionContext ? (
+            <div className="space-y-3 border-t pt-4">
+              {showContextDeleteConfirm ? (
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    Delete this session context? Attempts and reflections will
+                    stay in history.
+                  </AlertDescription>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => void handleClearContext()}
+                      disabled={isSavingContext}
+                    >
+                      {isSavingContext ? "Deleting…" : "Yes, delete context"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowContextDeleteConfirm(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </Alert>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setShowContextDeleteConfirm(true)}
+                >
+                  Delete context
+                </Button>
+              )}
+            </div>
+          ) : null}
+
+          {contextError ? (
+            <Alert variant="destructive">
+              <AlertDescription>{contextError}</AlertDescription>
+            </Alert>
+          ) : null}
+          {contextSaved ? (
+            <p className="text-sm text-primary">Session context saved.</p>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -727,6 +1167,63 @@ export function CodingSessionView({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ContextTextarea({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Textarea
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={4}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
+
+function SessionContextPreview({
+  context,
+}: {
+  context: CodingSessionContext;
+}) {
+  return (
+    <div className="space-y-4 rounded-lg border p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary">
+          {context.source === "generated" ? "Generated context" : "Manual context"}
+        </Badge>
+        {context.model ? <Badge variant="outline">{context.model}</Badge> : null}
+        <span className="text-xs text-muted-foreground">
+          Updated {new Date(context.updatedAt).toLocaleString()}
+        </span>
+      </div>
+
+      <ReflectionText title="Summary" text={context.summary} />
+      <ReflectionList title="Goals" items={context.goals} />
+      <ReflectionList title="Constraints" items={context.constraints} />
+      <ReflectionList
+        title="Files/components"
+        items={context.relevantFiles}
+      />
+      <ReflectionList title="Assumptions" items={context.assumptions} />
+      <ReflectionText title="Notes" text={context.notes} />
     </div>
   );
 }

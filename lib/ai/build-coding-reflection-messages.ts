@@ -5,6 +5,7 @@ import type {
   CodingSession,
 } from "@/lib/domain/coding-types";
 import { truncate, truncateUserMessage } from "@/lib/utils/truncate";
+import { formatCodingSessionContext } from "./format-coding-session-context";
 
 const FIELD_TRUNCATE = 1800;
 const ATTEMPT_TRUNCATE = 5200;
@@ -21,6 +22,7 @@ Your job:
 5. Give concrete next actions and a retry checklist.
 6. Explain why the recommendation may reduce token waste, without claiming measured token savings.
 7. Learn from previous same-session outcomes.
+8. Use saved session context as grounding material for every generation in this session.
 
 Recommended modes:
 - plan: ask the coding tool to inspect and plan before editing.
@@ -53,7 +55,8 @@ Respond with JSON only:
   "tokenWasteReductionReason": "why this may reduce token waste"
 }
 
-Keep the prompt practical and direct. Do not claim Replica executed code or measured token usage.`;
+Keep the prompt practical and direct. Do not claim Replica executed code or measured token usage.
+The betterNextPrompt must be substantial and structured. Include the relevant saved session context, the immediate objective, constraints, files/components to inspect when known, ordered steps for the external coding tool, expected deliverables, validation/checks, and instructions to avoid unrelated changes.`;
 
 const OUTCOME_LABELS: Record<CodingAttemptOutcome, string> = {
   unknown: "Unknown",
@@ -151,6 +154,9 @@ export function buildCodingReflectionMessages(input: {
     "",
     "## Session status",
     input.session.status,
+    "",
+    "## Saved session context",
+    formatCodingSessionContext(input.session.sessionContext),
     "",
     "## Attempts in this session",
   ];

@@ -5,6 +5,7 @@ import type {
   CodingSession,
 } from "@/lib/domain/coding-types";
 import { truncate, truncateUserMessage } from "@/lib/utils/truncate";
+import { formatCodingSessionContext } from "./format-coding-session-context";
 
 const FIELD_TRUNCATE = 1800;
 const HISTORY_TRUNCATE = 4200;
@@ -25,9 +26,10 @@ Replica does not execute code, does not inspect files directly, and does not int
 
 Your job:
 1. Recommend the best mode for the next external coding run.
-2. Produce a ready-to-copy coding prompt for the user's external tool.
+2. Produce a ready-to-copy coding prompt for the user's external tool that is detailed enough to guide a coding agent without being vague.
 3. Include concrete next actions and a retry checklist.
 4. Explain why the prompt may reduce token waste, without claiming measured savings.
+5. Use saved session context as grounding material for every generation in this session.
 
 Recommended modes:
 - plan: ask the coding tool to inspect and plan before editing.
@@ -51,7 +53,19 @@ Respond with JSON only:
   "tokenWasteReductionReason": "why this may reduce token waste"
 }
 
-Keep the generated prompt specific, bounded, and practical.`;
+Keep the generated prompt specific, bounded, and practical.
+The generatedPrompt must be substantial and structured. Include:
+- a clear role and objective
+- the relevant session context and task details
+- constraints and non-goals
+- files/components to inspect when known
+- an ordered workflow for the external coding tool
+- expected deliverables
+- validation or checks to run when applicable
+- instructions to avoid unrelated rewrites
+- a stopping point or question to ask if context is insufficient
+
+Do not generate a short generic prompt unless the user's input is truly minimal.`;
 
 const OUTCOME_LABELS: Record<CodingAttemptOutcome, string> = {
   unknown: "Unknown",
@@ -108,6 +122,9 @@ export function buildCodingPromptGenerationMessages(input: {
   const userParts = [
     "## Session task",
     truncate(input.session.taskDescription, FIELD_TRUNCATE),
+    "",
+    "## Saved session context",
+    formatCodingSessionContext(input.session.sessionContext),
     "",
     "## Feature/task description",
     truncate(input.request.featureTaskDescription, FIELD_TRUNCATE),

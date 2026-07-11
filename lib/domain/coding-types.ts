@@ -45,6 +45,24 @@ export type CodingAttemptSource = (typeof CODING_ATTEMPT_SOURCES)[number];
 
 export type CodingSessionStatus = "active" | "resolved";
 
+export const CODING_SESSION_CONTEXT_SOURCES = ["manual", "generated"] as const;
+
+export type CodingSessionContextSource =
+  (typeof CODING_SESSION_CONTEXT_SOURCES)[number];
+
+export interface CodingSessionContext {
+  summary: string;
+  goals: string[];
+  constraints: string[];
+  relevantFiles: string[];
+  assumptions: string[];
+  notes: string;
+  source: CodingSessionContextSource;
+  model?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CodingReflection {
   summary: string;
   whatWentWrong: string[];
@@ -86,6 +104,7 @@ export interface CodingSession {
   createdAt: string;
   updatedAt: string;
   status: CodingSessionStatus;
+  sessionContext: CodingSessionContext | null;
   attempts: CodingAttempt[];
 }
 
@@ -122,4 +141,15 @@ export interface UpdateCodingAttemptInput {
   status: CodingAttemptStatus;
   recommendedMode?: CodingRecommendedMode;
   source?: CodingAttemptSource;
+}
+
+export interface UpdateCodingSessionContextInput {
+  summary: string;
+  goals: string[];
+  constraints: string[];
+  relevantFiles: string[];
+  assumptions: string[];
+  notes: string;
+  source?: CodingSessionContextSource;
+  model?: string;
 }

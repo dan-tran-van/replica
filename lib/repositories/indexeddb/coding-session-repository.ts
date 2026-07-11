@@ -6,11 +6,13 @@ import type {
   CreateCodingSessionInput,
   UpdateCodingAttemptInput,
   UpdateCodingAttemptOutcomeInput,
+  UpdateCodingSessionContextInput,
 } from "@/lib/domain/coding-types";
 import { getDB } from "@/lib/db/client";
 import { INDEXES, STORES } from "@/lib/db/schema";
 import {
   normalizeCodingReflectionRecord,
+  normalizeCodingSessionContextRecord,
   normalizeCodingSessionRecord,
 } from "@/lib/domain/persistence-compat";
 import type { CodingSessionRepository } from "../types";
@@ -44,6 +46,7 @@ export class IndexedDBCodingSessionRepository
       createdAt: now,
       updatedAt: now,
       status: "active",
+      sessionContext: null,
       attempts: [],
     };
 
@@ -131,6 +134,56 @@ export class IndexedDBCodingSessionRepository
 
     await db.put(STORES.codingSessions, sessionWithStatus);
     return sessionWithStatus;
+  }
+
+  async updateContext(
+    sessionId: string,
+    input: UpdateCodingSessionContextInput,
+  ): Promise<CodingSession> {
+    const db = await getDB();
+    const session = await this.getRequiredSession(sessionId);
+    const now = new Date().toISOString();
+    const createdAt = session.sessionContext?.createdAt ?? now;
+    const context = normalizeCodingSessionContextRecord({
+      summary: input.summary.trim(),
+      goals: input.goals.map((item) => item.trim()).filter(Boolean),
+      constraints: input.constraints.map((item) => item.trim()).filter(Boolean),
+      relevantFiles: input.relevantFiles
+        .map((item) => item.trim())
+        .filter(Boolean),
+      assumptions: input.assumptions.map((item) => item.trim()).filter(Boolean),
+      notes: input.notes.trim(),
+      source: input.source ?? session.sessionContext?.source ?? "manual",
+      model: input.model ?? session.sessionContext?.model,
+      createdAt,
+      updatedAt: now,
+    });
+
+    if (!context) {
+      throw new Error("Add session context before saving.");
+    }
+
+    const updated: CodingSession = {
+      ...session,
+      sessionContext: context,
+      updatedAt: now,
+    };
+
+    await db.put(STORES.codingSessions, updated);
+    return updated;
+  }
+
+  async clearContext(sessionId: string): Promise<CodingSession> {
+    const db = await getDB();
+    const session = await this.getRequiredSession(sessionId);
+    const updated: CodingSession = {
+      ...session,
+      sessionContext: null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await db.put(STORES.codingSessions, updated);
+    return updated;
   }
 
   async updateAttempt(
