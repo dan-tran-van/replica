@@ -10,10 +10,10 @@ export function SelfHostSection() {
           Self-host in minutes
         </h2>
         <p className="mt-3 text-center text-sm text-muted-foreground">
-          No server secrets. Your OpenAI key lives in browser storage and is
-          sent only to OpenAI from your device.
+          No server secrets, accounts, databases, or cloud sync. Your OpenAI key
+          lives in browser storage and is sent only to OpenAI from your device.
         </p>
-        <Card className="mt-8">
+        <Card className="replica-fade-up mt-8">
           <CardHeader>
             <CardTitle className="text-base">Quick start</CardTitle>
           </CardHeader>
@@ -26,8 +26,9 @@ pnpm dev`}</code>
             </pre>
             <p className="text-sm text-muted-foreground">
               Open the app, add your API key in Settings, and create your first
-              workflow. Each deployment origin has isolated IndexedDB storage—data
-              does not migrate between hosts automatically.
+              workflow, coding session, or merge, then review Insights. Each
+              deployment origin has isolated IndexedDB storage; data does not
+              migrate between hosts automatically.
             </p>
             <Button asChild>
               <Link href="/workflows">Open the app</Link>

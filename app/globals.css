@@ -136,3 +136,122 @@ body {
     @apply font-sans;
   }
 }
+
+@keyframes replica-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes replica-flow-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scaleX(0.12);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes replica-marker-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in oklab, var(--primary) 16%, transparent);
+  }
+}
+
+.replica-fade-up {
+  animation: replica-fade-up 640ms ease both;
+}
+
+.replica-stagger-1 {
+  animation-delay: 80ms;
+}
+
+.replica-stagger-2 {
+  animation-delay: 160ms;
+}
+
+.replica-stagger-3 {
+  animation-delay: 240ms;
+}
+
+.replica-stagger-4 {
+  animation-delay: 320ms;
+}
+
+.replica-stagger-5 {
+  animation-delay: 400ms;
+}
+
+.replica-flow-line {
+  position: relative;
+}
+
+.replica-flow-line::before,
+.replica-flow-line::after {
+  display: none;
+}
+
+.replica-marker-pulse {
+  animation: replica-marker-pulse 2.4s ease-in-out infinite;
+}
+
+.replica-card-lift {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.replica-card-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 40px color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+
+@media (min-width: 640px) {
+  .replica-flow-line::before,
+  .replica-flow-line::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 14%;
+    right: 14%;
+    height: 1px;
+    transform: translateY(-50%);
+    transform-origin: left;
+  }
+
+  .replica-flow-line::before {
+    background: var(--border);
+  }
+
+  .replica-flow-line::after {
+    background: var(--primary);
+    animation: replica-flow-pulse 2.8s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .replica-fade-up,
+  .replica-flow-line::after,
+  .replica-marker-pulse {
+    animation: none;
+  }
+
+  .replica-card-lift,
+  .replica-card-lift:hover {
+    transform: none;
+    transition: none;
+  }
+}

@@ -5,9 +5,9 @@ import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Replica — Improve AI workflows through reflection",
+  title: "Replica - Remember. Reflect. Improve.",
   description:
-    "Record runs, capture reflections, and propose better prompts for recurring AI workflows. Local-first, browser-only.",
+    "A reflection layer for recurring AI workflows. Remember external runs, reflect on outcomes, and improve the next prompt. Local-first, browser-only.",
 };
 
 export default function RootLayout({

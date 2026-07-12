@@ -5,21 +5,20 @@ export function PhilosophySection() {
         <h2 className="text-2xl font-semibold tracking-tight">Why Replica</h2>
         <div className="mt-6 space-y-4 text-sm text-muted-foreground">
           <p>
-            Recurring AI workflows often repeat the same mistakes. More prompts,
-            more agents, and more automation do not fix that—they add noise.
-            What helps is structured reflection: what ran, what happened, what
-            you noticed, and what to try next.
+            Recurring AI workflows need memory. More prompts, more agents, and
+            more automation do not help if every run starts without the lessons
+            from the last one.
           </p>
           <p>
-            Replica is not an execution engine. It does not schedule tasks, run
-            agents, or sync to the cloud. It is a reflection layer you use
-            alongside the tools that actually run your workflows. You keep
-            control of every prompt change through a deliberate copy-only loop.
+            Replica turns repeated attempts into a usable reflection loop: what
+            ran, what happened, what changed, and what should improve before the
+            next prompt.
           </p>
           <p>
-            Over time, your iteration history becomes a record of how your
-            workflows evolved—grounded in real runs and your own observations,
-            not guesswork.
+            It is <span className="font-medium text-foreground">not</span> a
+            backend, scheduler, agent runner, or cloud sync service. It is the
+            local record you use alongside the tools that actually run your AI
+            workflows.
           </p>
         </div>
       </div>

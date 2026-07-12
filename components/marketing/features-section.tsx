@@ -10,50 +10,38 @@ const features = [
   {
     title: "Local-first, browser-only",
     description:
-      "All data stays in your browser. No backend, no cloud sync, no account required.",
+      "Workflows, coding sessions, merges, settings, and iterations stay in your browser.",
     badge: "Privacy",
   },
   {
     title: "IndexedDB storage",
     description:
-      "Workflows, iterations, and settings persist locally between sessions.",
+      "Structured local stores persist your history per deployment origin without cloud sync.",
     badge: "Storage",
   },
   {
-    title: "Run logging",
+    title: "BYOK AI assistance",
     description:
-      "Capture Manus output, outcomes, observations, and the prompt you used each time.",
-    badge: "Core loop",
-  },
-  {
-    title: "AI analysis (BYOK)",
-    description:
-      "OpenAI proposes improved prompts, reasoning, and next recommendations from your reflections.",
+      "Your OpenAI key lives in browser storage and powers optional prompt, reflection, and merge assistance.",
     badge: "AI",
   },
   {
-    title: "Copy-only loop",
+    title: "Copy-only control",
     description:
-      "You decide what to run next. Replica never auto-updates your canonical prompt.",
+      "Replica proposes prompts and strategies, but you decide what to run in your external tool.",
     badge: "Control",
   },
   {
-    title: "Full prompt history",
+    title: "Self-hosted on Vercel",
     description:
-      "Every iteration stores the prompt used—complete history per workflow, not a version system.",
-    badge: "History",
+      "Deploy it like a normal Next.js app without adding hosted databases, queues, or auth services.",
+    badge: "Hosting",
   },
   {
-    title: "Recommendation adherence",
+    title: "No cloud sync",
     description:
-      "Track whether you followed prior recommendations—yes, partially, no, or not applicable.",
-    badge: "Insights",
-  },
-  {
-    title: "Cross-workflow Insights",
-    description:
-      "Themes, timeline, workflow health, and optional AI-generated personal reflection.",
-    badge: "Analytics",
+      "Each deployment origin has isolated local storage; data does not migrate between hosts automatically.",
+    badge: "Boundary",
   },
 ];
 
@@ -65,15 +53,26 @@ export function FeaturesSection() {
           Features
         </h2>
         <p className="mt-3 text-center text-sm text-muted-foreground">
-          Built for recurring workflows you run outside Replica.
+          Cross-cutting guarantees that keep the reflection loop local and
+          controlled.
         </p>
         <div className="mt-10 grid gap-4 sm:grid-cols-2">
-          {features.map((feature) => (
-            <Card key={feature.title} size="sm">
+          {features.map((feature, index) => (
+            <Card
+              key={feature.title}
+              size="sm"
+              className="replica-card-lift replica-fade-up"
+              style={{ animationDelay: `${index * 70}ms` }}
+            >
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-base">{feature.title}</CardTitle>
-                  <Badge variant="secondary">{feature.badge}</Badge>
+                  <Badge
+                    variant="secondary"
+                    className="transition-colors group-hover/card:bg-primary group-hover/card:text-primary-foreground"
+                  >
+                    {feature.badge}
+                  </Badge>
                 </div>
                 <CardDescription>{feature.description}</CardDescription>
               </CardHeader>
